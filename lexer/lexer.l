@@ -29,7 +29,7 @@
     #define T_if 792
     #define T_return 793
 
-    #define T_const 800
+    #define T_integer 800
     #define T_id 801
     #define T_string 802
 
@@ -37,11 +37,18 @@
     #define T_bigEqual 904
     #define T_smallEqual 905
 
+    void ERROR (const char msg[]);
+    int lineno = 1;
 %}
+
 
 D [0-9]
 L [A-Za-z]
-W [ \t\n\r]
+W [ \t\r]
+
+
+%x COMMENT
+
 
 %%
 
@@ -81,23 +88,37 @@ W [ \t\n\r]
 ":" { return T_colon; }
 
 \".*\" { return T_string; }
-{D}+ {return T_const; }
+\-*{D}+ {return T_integer; }
 {L}({L}|{D}|_)* {return T_id;}
 {W}+ { /* nothing */ }
-\#.*\n { /*nothing */ }
-"(*"([^*]+|\*+[^*)])*\*+")" { /* nothing */ } //comments (**)
+\n { lineno++; }
+\#.*\n { lineno++; }
+
+"(*" { BEGIN(COMMENT); }
+<COMMENT>"*)" { BEGIN(INITIAL); }
+<COMMENT>\n { lineno++; }
+<COMMENT>"*" { /* nothing */ }
+<COMMENT>[^*\n]+ { /* nothing */ }
 
 
-.       { fprintf(stderr, "illegal token: %d\n", yytext[0]); }
+.       { ERROR("Illegal token"); }
 
 %%
+
+void ERROR(const char msg[]){
+    fprintf(stderr, "ERROR, line %d: %s\n", lineno, msg);
+    exit(1);
+}
+
 
 int main() { 
     int token;
     do{
         token = yylex();
-        printf("token=%d, lexeme=\"%s\"\n", token, yytext);
+        printf("token=%d, lexeme=\"%s\" @line: %d\n", token, yytext, lineno);
     } while (token != T_eof);
+
+    printf("Line count: %d\n", lineno);
 
     return 0;
 }
