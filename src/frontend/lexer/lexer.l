@@ -125,7 +125,7 @@
 							   (text[pos + 3] >= 'a' && text[pos + 3] <= 'f') ? text[pos + 3] - 'a' + 10 :
 							   (text[pos + 3] >= 'A' && text[pos + 3] <= 'F') ? text[pos + 3] - 'A' + 10 : -1;
 					if (val1 != -1 && val2 != -1) {
-						return (char)(val1 * 16 + val2);
+						return (char)(val1 * 16 + val2); // here returning ASCII char
 					}
 				}
 				fprintf(stderr, "Error: Invalid hex escape at line %d\n", lineno);
