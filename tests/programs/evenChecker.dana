@@ -1,0 +1,19 @@
+def main
+
+  def even: n as int, result as ref int
+    result := (n % 2)
+
+  var n is int
+  var res is int
+
+  n := readInteger()
+
+  even: n, res
+
+  writeInteger: n
+  writeString: " is "
+  if res = 0:
+    writeString: "even!"
+  else:
+    writeString: "odd!"
+  writeString: "\n"

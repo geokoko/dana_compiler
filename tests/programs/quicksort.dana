@@ -1,0 +1,59 @@
+def main
+    def partition is int: low high as int, arr as int []
+        var pivot i temp j is int 
+        pivot := arr[high]
+        i := low - 1
+        j := low
+        loop:
+            if j >= high: break 
+            if arr[j] < pivot:
+                i := i + 1
+                temp := arr[i]
+                arr[i] := arr[j]
+                arr[j] := temp
+            j := j + 1
+        temp := arr[i+1]
+        arr[i+1] := arr[high]
+        arr[high] := temp
+        return: i+1
+
+    def quicksort: low high as int, arr as int []
+        var pi is int 
+        if low < high: 
+            pi := partition(low, high, arr)
+            quicksort: low, pi-1, arr
+            quicksort: pi+1, high, arr
+
+    var N is int
+    var nums is int [100] 
+    var k is int
+
+    # writeString: "Enter number of elements (max 100):\n"
+    N := readInteger()
+
+    if N > 100:
+        writeString: "Error: Number of elements exceeds maximum allowed size (100).\n"
+        exit
+    if N <= 0:
+        writeString: "Number of elements must be positive.\n"
+        exit
+
+    k := 0
+    loop:
+        if k >= N: break 
+        # writeString: "Enter element "
+        nums[k] := readInteger()
+        k := k + 1
+
+    quicksort: 0, N-1, nums 
+
+    k := 0
+    writeString: "Sorted array: "
+    loop:
+        if k < N:
+            if k > 0: writeString: ", " 
+            writeInteger: nums[k]
+            k := k+1
+        else:
+            break
+    writeString: "\n"

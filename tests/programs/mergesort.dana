@@ -1,0 +1,92 @@
+def main
+    var n_main is int
+    var arr_main is int [1000]
+    var i_main is int
+    var dummy_val is int
+
+    def merge: arr_param as int [], left_param as int, mid_param as int, right_param as int
+        var n1_local n2_local i_local j_local k_local is int
+        var L_temp is int [1000]
+        var R_temp is int [1000]
+
+        n1_local := mid_param - left_param + 1
+        n2_local := right_param - mid_param
+
+        i_local := 0
+        loop:
+            if i_local < n1_local and left_param + i_local < 1000 and i_local < 1000:
+                L_temp[i_local] := arr_param[left_param + i_local]
+                i_local := i_local + 1
+            else: break
+
+        j_local := 0
+        loop:
+            if j_local < n2_local and mid_param + 1 + j_local < 1000 and j_local < 1000:
+                R_temp[j_local] := arr_param[mid_param + 1 + j_local]
+                j_local := j_local + 1
+            else: break
+
+        i_local := 0
+        j_local := 0
+        k_local := left_param
+
+        loop:
+            if i_local < n1_local and j_local < n2_local:
+                if L_temp[i_local] <= R_temp[j_local]:
+                    if k_local < 1000: arr_param[k_local] := L_temp[i_local]
+                    i_local := i_local + 1
+                else:
+                    if k_local < 1000: arr_param[k_local] := R_temp[j_local]
+                    j_local := j_local + 1
+                k_local := k_local + 1
+            else: break
+
+        loop:
+            if i_local < n1_local:
+                if k_local < 1000: arr_param[k_local] := L_temp[i_local]
+                i_local := i_local + 1
+                k_local := k_local + 1
+            else: break
+
+        loop:
+            if j_local < n2_local:
+                if k_local < 1000: arr_param[k_local] := R_temp[j_local]
+                j_local := j_local + 1
+                k_local := k_local + 1
+            else: break
+
+    def merge_sort: arr_param as int [], left_param as int, right_param as int
+        var mid_local is int
+
+        if left_param < right_param:
+            mid_local := (left_param + right_param) / 2
+            merge_sort: arr_param, left_param, mid_local
+            merge_sort: arr_param, mid_local + 1, right_param
+            merge: arr_param, left_param, mid_local, right_param
+
+    n_main := readInteger()
+
+    i_main := 0
+    loop:
+        if i_main >= n_main: break
+        if i_main < 1000:
+            arr_main[i_main] := readInteger()
+        else:
+            dummy_val := readInteger()
+        i_main := i_main + 1
+    
+    if n_main > 1000:
+        writeString: "Warning: Input size exceeds program capacity (1000 elements). Processing first 1000.\n"
+        n_main := 1000
+
+    if n_main > 0 :
+        merge_sort: arr_main, 0, n_main - 1
+
+    i_main := 0
+    loop:
+        if i_main >= n_main: break
+        if i_main < 1000:
+             writeInteger: arr_main[i_main]
+        i_main := i_main + 1
+        if i_main <> n_main: writeString: " "
+    writeString: "\n"
