@@ -49,8 +49,9 @@
 	#define T_AUTO_END 5001
 
 	/* global variables */
-	int lineno = 1;				// keeps tracks of the current line we are scanning
+	int lineno = 1;				// keeps track of the current line we are scanning
 	int columno = 1;			// keeps track of the current column (def: the first column where a non whitespace character is met)
+	int commentDepth = 0;
 
 	/* Layout management
 	 * Definition: Column of a token refers to the column where its first character is encountered in the code
@@ -168,12 +169,14 @@ DIGIT [0-9]
 LETTER [a-zA-Z]
 ID_CHAR [a-zA-Z0-9_]
 
+%s COMMENT
+
 %%
 
 "def"					{ 
 	/* Guide token */
 	if (atLineStart) checkIndentation(columno);
-	pushGuide("def", columno); 
+	pushGuide("def", columno);
 	atLineStart = false;
 	columno += yyleng;
 	return T_DEF; 
@@ -327,6 +330,23 @@ ID_CHAR [a-zA-Z0-9_]
 	return T_RET; 
 }
 
+"(*" 			 { commentDepth++;
+				   BEGIN(COMMENT); }
+<COMMENT>"*)" 	 { commentDepth--;
+				   if(commentDepth == 0) {
+					columno += yyleng;		//For the case that there is code after the comment in the same line	
+				    atLineStart = false;
+				    BEGIN(INITIAL); }
+				 }
+<COMMENT>\n 	 { handleNewLine(); }
+<COMMENT>"*" 	 { columno += 1; }
+<COMMENT>[^*\n]+ { columno += yyleng; }		//Track column if code follows
+<COMMENT><<EOF>> {
+    fprintf(stderr, "Error: EOF reached inside a comment at line %d\n", lineno);
+    exit(1);
+}
+
+
 {DIGIT}+				{ 
 	/* Integer constant */
 	if (atLineStart) checkIndentation(columno);
@@ -335,7 +355,7 @@ ID_CHAR [a-zA-Z0-9_]
 	return T_INT_CONST; 
 }
 
-'([^\'\\]|\\.)'			{
+'([^\'\\]|\\[nrt0'"\\]|\\x[0-9A-Fa-f]{2})'		{
 	/* Character constant with escape handling */
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
@@ -355,12 +375,12 @@ ID_CHAR [a-zA-Z0-9_]
 }
 
 
-\"([^\"\\]|\\.)*\"		{
+\"([^\"\n\r\\]|\\.)*\"		{
 	/* String constant with escape handling */
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	processStringEscapes(yytext);
+	processStringEscapes(yytext); 
 	return T_STRING_CONST;
 }
 
@@ -431,7 +451,7 @@ ID_CHAR [a-zA-Z0-9_]
 \t						{ columno += 8; /* assuming tab width of 8 */ }
 \n						{ handleNewLine(); }
 
-#.*						{ /* ignore line comments */ }
+#.*\n					{ handleNewLine(); }
 
 .						{ 
 	/* Error handling for illegal characters */
