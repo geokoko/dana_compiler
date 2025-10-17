@@ -123,11 +123,10 @@ localdef_list
 	;
 
 local_def
-	: func_def									{ $$ = make_unique<Def>(mkLoc(@$), move($1)); } 
-	| func_decl 			                    { $$ = make_unique<Def>(mkLoc(@$), move($1)); } 			
-	| var_def									{ $$ = make_unique<Def>(mkLoc(@$), move($1)); } 
+	: func_def									{ $$ = move($1); } 
+	| func_decl 			                    { $$ = move($1); } 			
+	| var_def									{ $$ = move($1); } 
 	;
-
 
 func_decl
 	: T_DECL header								{ $$ = make_unique<FuncDecl>(mkLoc(@$), move($2)); }	
