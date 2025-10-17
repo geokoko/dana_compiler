@@ -168,7 +168,7 @@ fpar_list
 	;
 
 fpar_def
-	: id_list T_AS fpar_type 					{ $$ = make_unique<FparDef>(mkLoc(@$), move($1), move($3)); }
+	: id_list T_AS fpar_type 					{ $$ = make_unique<FParDef>(mkLoc(@$), move($1), move($3)); }
 	;
 
 id_list
