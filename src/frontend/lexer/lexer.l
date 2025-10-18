@@ -9,54 +9,10 @@
 	using dana::parser;
 
 	#define YY_DECL int yylex(parser::semantic_type& yylval, parser::location_type& yylloc)
-	#define YY_USER_ACTION yyloc.columns(yyleng);
-	/* TOKEN definitions */
-	#define T_EOF 0				// EOF
+	#define YY_USER_ACTION yylloc.columns(yyleng);
 
-	/* KEYWORDS */
-	#define T_AND 1001
-	#define T_AS 1002
-	#define T_BEGIN 1003	
-	#define T_BREAK 1004
-	#define T_BYTE 1005
-	#define T_CONT 1006			// CONTINUE
-	#define T_DECL 1007
-	#define T_DEF 1008
-	#define T_ELIF 1009
-	#define T_ELSE 1010
-	#define T_END 1011
-	#define T_EXIT 1012
-	#define T_FALSE 1013
-	#define T_IF 1014
-	#define T_IS 1015
-	#define T_INT 1016
-	#define T_LOOP 1017
-	#define T_NOT 1018
-	#define T_OR 1019
-	#define T_REF 1020
-	#define T_RET 1021			// RETURN
-	#define T_SKIP 1022
-	#define T_TRUE 1023
-	#define T_VAR 1024
-
-	/* IDENTIFIERS */
-	#define T_ID 2001			// general identifier: var names, function names etc.
-	#define T_INT_CONST 2002	// number (eg. 42). Treated as a constant integer
-	#define T_CHAR_CONST 2003	// character constant
-	#define T_STRING_CONST 2004	// String (eg. "abc"). Treated as a constant string
-
-	/* OPERATORS (multi-char) */
-	#define T_ASSIGN 3001		// :=
-	#define T_NE 3002			// <>
-	#define T_LE 3003			// <=
-	#define T_GE 3004			// >=
-
-	/* special tokens */
-	#define T_AUTO_END 5001
-
-	/* global variables */
-	int lineno = 1;				// keeps track of the current line we are scanning
-	int columno = 1;			// keeps track of the current column (def: the first column where a non whitespace character is met)
+	int lineno = 1;
+	int columno = 1;
 	int commentDepth = 0;
 
 	/* Layout management
@@ -64,51 +20,51 @@
 	 */
 	#define MAX_INDENT_LEVELS 500
 
-	int indentStack[MAX_INDENT_LEVELS];
+	int indentStack[MAX_INDENT_LEVELS] = { -1 };
 	int cur_indent_level = 1;
 	int pendingAutoEnds = 0;
 	bool atLineStart = true;
 
-	// Initialize the stack
-	void initStack() {
-		indentStack[0] = -1;
-	}
-
 	// Guide token encountered (push)
-	void pushGuide (const char* guide_name, int guide_col) {
+	static inline void pushGuide (const char* guide_name, int guide_col) {
 		if (cur_indent_level >= MAX_INDENT_LEVELS) {
 			fprintf(stderr, "Error: Too many nested levels at line %d\n", lineno);
 			exit(1);
 		}
 
 		indentStack[cur_indent_level++] = guide_col;
-		printf("Guide pushed: %s at column %d\n", guide_name, guide_col);
+		//printf("Guide pushed: %s at column %d\n", guide_name, guide_col);
 	}
 
 	// Go up one indentation level. 2 possibilities for usage of this:
 	// a. Next token is first in a new line and it is located in a column lefter than the column of the guide word
 	// b. EOF encountered
-	void popGuide () {
+	static inline void popGuide () {
 		if (cur_indent_level > 1) {
 			indentStack[--cur_indent_level] = -1;
 		}
 	}
 
 	// Check indentation status at line start
-	void checkIndentation (int curr_col) {
+	static inline void checkIndentation (int curr_col) {
 		if (!atLineStart) return;
 
+		// condition: there are indentation layers and the current column we are scanning is not to the right of the guide token
 		while (cur_indent_level > 1 && curr_col <= indentStack[cur_indent_level - 1]) {
+			// then we pop guide (we move up one indentation layer)
 			popGuide();
+			// and mark that we need to emit an <auto-end> token
 			pendingAutoEnds++;
 		}
 	}
 
 	// Handle newline - reset column and set line start flag
-	void handleNewLine() {
+	static inline void handleNewLine() {
 		lineno++;
-		columno = 1;
+		column = 1;
 		atLineStart = true;
+		yylloc.lines(yyleng);
+		yylloc.step();
 	}
 
 	// Escape processing functions
@@ -143,33 +99,35 @@
 		}
 	}
 
-	void processStringEscapes(char* input) {
-		int len = strlen(input);
-		char* result = (char*)malloc(len + 1);
-		int i = 1; // Skip opening quote
-		int j = 0;
-		
-		while (i < len - 1) { // Until closing quote
-			if (input[i] == '\\') {
-				result[j++] = processEscape(input, i);
-				// Skip escape sequence
-				if (input[i+1] == 'x') {
-					i += 4; // \xnn
-				} else {
-					i += 2; // \c
-				}
-			} else {
-				result[j++] = input[i++];
-			}
-		}
-		result[j] = '\0';
-		
-		// Replace yytext content with processed string
-		strcpy(yytext, result);
-		free(result);
+	std::string processStringEscapes(const char* input) {
+    	int len = std::strlen(input);
+    	std::string result;
+    	result.reserve(len); // avoids reallocations
+
+    	int i = 1; // Skip opening quote
+    	while (i < len - 1) { // Until before closing quote
+        	if (input[i] == '\\') {
+            	// Handle escape sequence
+            	char c = processEscape(input, i);
+            	result.push_back(c);
+
+            	// Skip over the escape sequence in the source text
+            	if (input[i + 1] == 'x')
+                	i += 4;   // \xNN
+            	else
+                	i += 2;   // \n, \t, etc.
+        	} else {
+            	result.push_back(input[i]);
+            	i++;
+        	}
+    	}
+
+    	return result;
 	}
 
 %}
+
+%option noyywrap nodefault
 
 DIGIT [0-9]
 LETTER [a-zA-Z]
@@ -179,13 +137,31 @@ ID_CHAR [a-zA-Z0-9_]
 
 %%
 
+/* 0-width emission of pending AUTO_END, without consuming input */
+.|\n 					{
+	if (pendingAutoEnds > 0) {
+    	--pendingAutoEnds;
+    	return parser::token::T_AUTO_END;
+	}
+  	yyless(0); /* put char back; fall through to real rules */
+}
+
+/* Flush remaining AUTO_ENDs (due to guides) on EOF */
+<<EOF>> 				{
+	while (cur_indent_level > 1) {
+		popGuide();
+    	return parser::token::T_AUTO_END;
+  	}
+  	return 0; /* YYEOF */
+}
+
 "def"					{ 
 	/* Guide token */
 	if (atLineStart) checkIndentation(columno);
 	pushGuide("def", columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_DEF; 
+	return parser::token::T_DEF; 
 }
 "if"					{ 
 	/* Guide token */
@@ -193,7 +169,7 @@ ID_CHAR [a-zA-Z0-9_]
 	pushGuide("if", columno); 
 	atLineStart = false;
 	columno += yyleng;
-	return T_IF; 
+	return parser::token::T_IF; 
 }
 "elif"					{ 
 	/* Guide token */
@@ -201,7 +177,7 @@ ID_CHAR [a-zA-Z0-9_]
 	pushGuide("elif", columno); 
 	atLineStart = false;
 	columno += yyleng;
-	return T_ELIF; 
+	return parser::token::T_ELIF; 
 }
 "else"					{ 
 	/* Guide token */
@@ -209,15 +185,16 @@ ID_CHAR [a-zA-Z0-9_]
 	pushGuide("else", columno); 
 	atLineStart = false;
 	columno += yyleng;
-	return T_ELSE; 
+	return parser::token::T_ELSE; 
 }
+
 "loop"					{ 
 	/* Guide token */
 	if (atLineStart) checkIndentation(columno);
 	pushGuide("loop", columno); 
 	atLineStart = false;
 	columno += yyleng;
-	return T_LOOP; 
+	return parser::token::T_LOOP; 
 }
 
 "and"					{ 
@@ -225,115 +202,115 @@ ID_CHAR [a-zA-Z0-9_]
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_AND; 
+	return parser::token::T_AND; 
 }
 "is"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_IS; 
+	return parser::token::T_IS; 
 }
 "skip"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_SKIP; 
+	return parser::token::T_SKIP; 
 }
 "as"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_AS; 
+	return parser::token::T_AS; 
 }
 "int"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_INT; 
+	return parser::token::T_INT; 
 }
 "true"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_TRUE; 
+	return parser::token::T_TRUE; 
 }
 "begin"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_BEGIN; 
+	return parser::token::T_BEGIN; 
 }
 "var"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_VAR; 
+	return parser::token::T_VAR; 
 }
 "break"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_BREAK; 
+	return parser::token::T_BREAK; 
 }
 "end"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_END; 
+	return parser::token::T_END; 
 }
 "not"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_NOT; 
+	return parser::token::T_NOT; 
 }
 "byte"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_BYTE; 
+	return parser::token::T_BYTE; 
 }
 "exit"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_EXIT; 
+	return parser::token::T_EXIT; 
 }
 "or"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_OR; 
+	return parser::token::T_OR; 
 }
 "continue"				{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_CONT; 
+	return parser::token::T_CONT; 
 }
 "false"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_FALSE; 
+	return parser::token::T_FALSE; 
 }
 "ref"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_REF; 
+	return parser::token::T_REF; 
 }
 "decl"					{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_DECL; 
+	return parser::token::T_DECL; 
 }
 "return"				{ 
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_RET; 
+	return parser::token::T_RET; 
 }
 
 "(*" 			 { commentDepth++;
@@ -352,13 +329,13 @@ ID_CHAR [a-zA-Z0-9_]
     exit(1);
 }
 
-
 {DIGIT}+				{ 
 	/* Integer constant */
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_INT_CONST; 
+	yylval.emplace<int>(std::stoi(yytext));
+	return parser::token::T_INT_CONST; 
 }
 
 '([^\'\\]|\\[nrt0'"\\]|\\x[0-9A-Fa-f]{2})'		{
@@ -366,10 +343,14 @@ ID_CHAR [a-zA-Z0-9_]
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
+	char c;
 	if (yytext[1] == '\\')
-		return processEscape(yytext, 1);
+		c = processEscape(yytext, 1);
 	else
-		return yytext[1];
+		c = yytext[1];
+
+	yylval.emplace<char>(c);
+	return parser::token::T_CHAR_CONST;
 }
 
 {LETTER}{ID_CHAR}*		{ 
@@ -377,7 +358,9 @@ ID_CHAR [a-zA-Z0-9_]
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_ID; 
+
+	yylval.emplace<std::string>(yytext);
+	return parser::token::T_ID; 
 }
 
 
@@ -386,8 +369,10 @@ ID_CHAR [a-zA-Z0-9_]
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	processStringEscapes(yytext); 
-	return T_STRING_CONST;
+	std::string s = processStringEscapes(yytext);
+	
+	yylval.emplace<std::string>(std::move(s));
+	return parser::token::T_STRING_CONST;
 }
 
 
@@ -396,28 +381,28 @@ ID_CHAR [a-zA-Z0-9_]
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_ASSIGN; 
+	return parser::token::T_ASSIGN; 
 }
 "<>"                    { 
 	/* Not equal operator */
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_NE; 
+	return parser::token::T_NE; 
 }
 "<="                    { 
 	/* Less than or equal operator */
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_LE; 
+	return parser::token::T_LE; 
 }
 ">="                    { 
 	/* Greater than or equal operator */
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	return T_GE; 
+	return parser::token::T_GE; 
 }
 
 
@@ -455,7 +440,7 @@ ID_CHAR [a-zA-Z0-9_]
 [ ]+					{ columno += yyleng; /* ignore spaces but track column */ }
 \r						{ /* ignore carriage return */ }
 \t						{ columno += 8; /* assuming tab width of 8 */ }
-\n						{ handleNewLine(); }
+\n+						{ handleNewLine(); }
 
 #.*\n					{ handleNewLine(); }
 
@@ -467,68 +452,3 @@ ID_CHAR [a-zA-Z0-9_]
 
 %%
 
-int yywrap() { return 1; }
-
-/* Wrapper for yylex to handle <auto-end>s correctly */
-int yylex_wrapper () {
-	if (pendingAutoEnds > 0) {
-		pendingAutoEnds--;
-		return T_AUTO_END;
-	}
-
-	int token = yylex();
-
-	// At end of file, emit any remaining AUTO_END tokens
-	if (token == 0 && cur_indent_level > 1) {
-		pendingAutoEnds = cur_indent_level - 1;
-		cur_indent_level = 1;
-		if (pendingAutoEnds > 0) {
-			pendingAutoEnds--;
-			return T_AUTO_END;
-		}
-	}
-
-	return token;
-}
-
-int main() {
-	initStack();  // Initialize the indentation stack
-	
-	int token;
-	printf("Dana Lexer Test\n");
-	printf("===============\n");
-	
-	do {
-		token = yylex_wrapper();
-		
-		switch(token) {
-			case T_EOF:
-				printf("EOF\n");
-				break;
-			case T_AUTO_END:
-				printf("AUTO_END\n");
-				break;
-			case T_INT_CONST:
-				printf("INT_CONST: %s\n", yytext);
-				break;
-			case T_CHAR_CONST:
-				printf("CHAR_CONST: %s\n", yytext);
-				break;
-			case T_STRING_CONST:
-				printf("STRING_CONST: %s\n", yytext);
-				break;
-			case T_ID:
-				printf("IDENTIFIER: %s\n", yytext);
-				break;
-			default:
-				if (token >= 1000) {
-					printf("KEYWORD/TOKEN: %d (%s)\n", token, yytext);
-				} else {
-					printf("OPERATOR: '%c' (ASCII %d)\n", token, token);
-				}
-				break;
-		}
-	} while (token != T_EOF);
-	
-	return 0;
-}
