@@ -3,7 +3,13 @@
 	#include <cstdlib>
 	#include <cstring>
 	#include <cctype>
+	#include <string>
 
+	#include "parser.hpp"
+	using dana::parser;
+
+	#define YY_DECL int yylex(parser::semantic_type& yylval, parser::location_type& yylloc)
+	#define YY_USER_ACTION yyloc.columns(yyleng);
 	/* TOKEN definitions */
 	#define T_EOF 0				// EOF
 

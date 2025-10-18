@@ -25,7 +25,7 @@
 	/* elif pair type (cond, block) for storing elifs */
 	using ElifPair = std::pair<up<Cond>, up<Block>>;
 
-	/* yylex signature (TODO: connect this with lexer later) */
+	/* forward decl for the parser class and yylex */
 	namespace dana { class parser; } 
 	extern int yylex(dana::parser::semantic_type& yylval,
 					 dana::parser::location_type& yylloc);
@@ -39,12 +39,9 @@
 %code {
 	#include <iostream>
 
-	/* TODO: Check parse error logging function */
-	void dana::parser::error (const location_type& loc, const std::string& msg) {
+	static void yyerror (const location_type& loc, const std::string& msg) {
 		SourceLoc here{ (int)loc.begin.line, (int)loc.begin.column };
 		std::cerr << here.line << ':' << here.column << ": " << msg << '\n';
-
-		driver.last_error_loc = here;
 	}
 }
 
@@ -94,7 +91,7 @@
 %type <optional<DataType>>  				opt_ret_type // optional function return type
 %type <vec<up<FParDef>>>    				opt_params // optional function parameters
 %type <vec<optional<int>>> 					fpar_dims	// optional array dimensions list as function parameter
-%type <vec<optional<int>>					type_dims	// optional array dimensions list in type definition
+%type <vec<optional<int>>>					type_dims	// optional array dimensions list in type definition
 %type <optional<int>> 						dim_opt // a single, optional array dimension as parameter
 %type <optional<up<Block>>>					opt_else // optional Else block
 %type <optional<string>> 					opt_id	// optional identifier
@@ -142,7 +139,7 @@ type
 	;
 
 type_dims
-	:                             				{ $$ = vec<std::optional<int>>{}; }
+	:                             				{ $$ = vec<optional<int>>{}; }
 	| type_dims '[' T_INT_CONST ']' 			{ $1.emplace_back($3); $$ = move($1); }
 	;
 
@@ -306,15 +303,15 @@ expr
 	;
 
 cond
-	: expr                  { $$ = make_unique<ExprCond>(mkLoc(@$), move($1)); }
-	| '(' cond ')'          { $$ = make_unique<ParenCond>(mkLoc(@$), move($2)); }
-	| T_NOT cond            { $$ = make_unique<NotCond>(mkLoc(@$), move($2)); }
-	| cond T_AND cond       { $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::And, move($1), move($3)); }
-	| cond T_OR  cond       { $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::Or,  move($1), move($3)); }
-	| expr '='  expr        { $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Eq, move($1), move($3)); }
-	| expr T_NE expr        { $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ne, move($1), move($3)); }
-	| expr T_LE expr        { $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Le, move($1), move($3)); }
-	| expr T_GE expr        { $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ge, move($1), move($3)); }
-	| expr '<' expr         { $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Lt, move($1), move($3)); }
-	| expr '>' expr         { $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Gt, move($1), move($3)); }
+	: expr                  					{ $$ = make_unique<ExprCond>(mkLoc(@$), move($1)); }
+	| '(' cond ')'          					{ $$ = make_unique<ParenCond>(mkLoc(@$), move($2)); }
+	| T_NOT cond            					{ $$ = make_unique<NotCond>(mkLoc(@$), move($2)); }
+	| cond T_AND cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::And, move($1), move($3)); }
+	| cond T_OR  cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::Or,  move($1), move($3)); }
+	| expr '='  expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Eq, move($1), move($3)); }
+	| expr T_NE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ne, move($1), move($3)); }
+	| expr T_LE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Le, move($1), move($3)); }
+	| expr T_GE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ge, move($1), move($3)); }
+	| expr '<' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Lt, move($1), move($3)); }
+	| expr '>' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Gt, move($1), move($3)); }
 	;

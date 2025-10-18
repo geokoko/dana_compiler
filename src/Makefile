@@ -23,7 +23,7 @@ LEXER_H = $(LEXER_DIR)/lexer.hpp
 PARSER_CPP = $(PARSER_DIR)/parser.tab.cc
 PARSER_HH = $(PARSER_DIR)/parser.tab.hh
 
-SRCS := main.cpp ast.cpp $(PARSER_CPP) $(LEXER_CPP)
+SRCS := main.cpp $(AST_DIR)/ast.cpp $(AST_DIR)/ast_print.cpp $(PARSER_CPP) $(LEXER_CPP)
 OBJS := $(SRCS:.cpp=.o)
 
 # Default target
