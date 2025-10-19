@@ -1,7 +1,7 @@
 %skeleton "lalr1.cc"
 %require "3.8"
 %define api.namespace {dana}
-%define api.value.type {variant}
+%define api.value.type variant
 %define parse.error detailed
 %locations
 %start program
@@ -12,7 +12,8 @@
 	#include <vector>
 	#include <utility>
 	#include <optional>
-	#include "ast.hpp"
+
+	#include "../ast/ast.hpp"
 
 	/* Handy aliases */
 	using std::move;
@@ -27,22 +28,29 @@
 
 	/* forward decl for the parser class and yylex */
 	namespace dana { class parser; } 
-	extern int yylex(dana::parser::semantic_type& yylval,
-					 dana::parser::location_type& yylloc);
-
-	// Convert Bison location -> SourceLoc (use begin point)
-  	static inline SourceLoc mkLoc(const dana::parser::location_type& L) {
-    	return SourceLoc{ (int)L.begin.line, (int)L.begin.column };
-  	}
 }
 
 %code {
 	#include <iostream>
 
-	static void yyerror (const location_type& loc, const std::string& msg) {
-		SourceLoc here{ (int)loc.begin.line, (int)loc.begin.column };
-		std::cerr << here.line << ':' << here.column << ": " << msg << '\n';
+	extern int yylex(dana::parser::semantic_type* yylval, dana::parser::location_type* yylloc);
+
+	// Convert Bison location -> SourceLoc (use begin point)
+  	static inline SourceLoc mkLoc(const dana::parser::location_type& L) {
+    	return SourceLoc{ (int)L.begin.line, (int)L.begin.column };
 	}
+
+	static void yyerror (const dana::parser::location_type& loc, const std::string& msg) {
+		SourceLoc here{ (int)loc.begin.line, (int)loc.begin.column };
+		std::cerr << here.line << ':' << here.col << ": " << msg << '\n';
+	}
+
+	// Bison C++ interface expects this method on the parser class
+	void dana::parser::error(const dana::parser::location_type& loc, const std::string& msg) {
+		SourceLoc here{ (int)loc.begin.line, (int)loc.begin.column };
+		std::cerr << here.line << ':' << here.col << ": " << msg << '\n';
+	}
+
 }
 
 /* KEYWORDS */
@@ -92,7 +100,6 @@
 %type <vec<up<FParDef>>>    				opt_params // optional function parameters
 %type <vec<optional<int>>> 					fpar_dims	// optional array dimensions list as function parameter
 %type <vec<optional<int>>>					type_dims	// optional array dimensions list in type definition
-%type <optional<int>> 						dim_opt // a single, optional array dimension as parameter
 %type <optional<up<Block>>>					opt_else // optional Else block
 %type <optional<string>> 					opt_id	// optional identifier
 
@@ -102,7 +109,7 @@
 %nonassoc '=' T_NE '<' '>' T_LE T_GE
 %left '+' '-'
 %left '*' '/' '%'
-%right UPLUS UMINUS '!' T_NOT
+%precedence UPLUS UMINUS '!' T_NOT
 
 %%
 
@@ -115,7 +122,7 @@ func_def
 	;
 
 localdef_list
-	: 											{ $$ = vec<up<Def>>{}; }
+	: %empty									{ $$ = vec<up<Def>>{}; }
 	| localdef_list local_def					{ $1.emplace_back(move($2)); $$ = move($1); }
 	;
 
@@ -139,8 +146,8 @@ type
 	;
 
 type_dims
-	:                             				{ $$ = vec<optional<int>>{}; }
-	| type_dims '[' T_INT_CONST ']' 			{ $1.emplace_back($3); $$ = move($1); }
+	: %empty									{ $$ = vec<optional<int>>{}; }
+	| type_dims '[' T_INT_CONST ']'				{ $1.emplace_back($3); $$ = move($1); }
 	;
 
 header
@@ -148,13 +155,13 @@ header
 	;
 
 opt_ret_type
-	:                							{ $$ = optional<DataType>{}; }
+	: %empty									{ $$ = optional<DataType>{}; }
 	| T_IS T_INT     							{ $$ = DataType::Int; }
 	| T_IS T_BYTE    							{ $$ = DataType::Byte; }
 	;
 
 opt_params
-	:											{ $$ = vec<up<FParDef>>{}; }
+	: %empty									{ $$ = vec<up<FParDef>>{}; }
 	| ':' fpar_list								{ $$ = move($2); }
 	;
 
@@ -248,12 +255,12 @@ if_stmt
 	;
 
 elif_list
-	:                         					{ $$ = vec<std::pair<up<Cond>, up<Block>>>{}; }
+	: %empty									{ $$ = vec<std::pair<up<Cond>, up<Block>>>{}; }
 	| elif_list T_ELIF cond ':' block 			{ $1.emplace_back(std::make_pair(move($3), move($5))); $$ = move($1); }
 	;
 
 opt_else
-	:                         					{ $$ = optional<up<Block>>{}; }
+	: %empty									{ $$ = optional<up<Block>>{}; }
 	| T_ELSE ':' block        					{ $$ = optional<up<Block>>{ move($3) }; }
 	;
 
@@ -262,7 +269,7 @@ loop_stmt
 	;
 
 opt_id
-	:           								{ $$ = optional<string>{}; }
+	: %empty									{ $$ = optional<string>{}; }
 	| T_ID      								{ $$ = optional<string>{ move($1) }; }
 	;
 

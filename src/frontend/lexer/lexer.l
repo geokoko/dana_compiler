@@ -5,126 +5,33 @@
 	#include <cctype>
 	#include <string>
 
-	#include "parser.hpp"
+	#include "../parser/parser.tab.hh"
 	using dana::parser;
 
-	#define YY_DECL int yylex(parser::semantic_type& yylval, parser::location_type& yylloc)
-	#define YY_USER_ACTION yylloc.columns(yyleng);
+	#define YY_DECL int yylex(parser::semantic_type* yylval, parser::location_type* yylloc)
+	#define YY_USER_ACTION yylloc->columns(yyleng);
 
-	int lineno = 1;
-	int columno = 1;
-	int commentDepth = 0;
+	static int lineno = 1;
+	static int columno = 1;
+	static int commentDepth = 0;
 
 	/* Layout management
 	 * Definition: Column of a token refers to the column where its first character is encountered in the code
 	 */
 	#define MAX_INDENT_LEVELS 500
 
-	int indentStack[MAX_INDENT_LEVELS] = { -1 };
-	int cur_indent_level = 1;
-	int pendingAutoEnds = 0;
-	bool atLineStart = true;
-
-	// Guide token encountered (push)
-	static inline void pushGuide (const char* guide_name, int guide_col) {
-		if (cur_indent_level >= MAX_INDENT_LEVELS) {
-			fprintf(stderr, "Error: Too many nested levels at line %d\n", lineno);
-			exit(1);
-		}
-
-		indentStack[cur_indent_level++] = guide_col;
-		//printf("Guide pushed: %s at column %d\n", guide_name, guide_col);
-	}
-
-	// Go up one indentation level. 2 possibilities for usage of this:
-	// a. Next token is first in a new line and it is located in a column lefter than the column of the guide word
-	// b. EOF encountered
-	static inline void popGuide () {
-		if (cur_indent_level > 1) {
-			indentStack[--cur_indent_level] = -1;
-		}
-	}
-
-	// Check indentation status at line start
-	static inline void checkIndentation (int curr_col) {
-		if (!atLineStart) return;
-
-		// condition: there are indentation layers and the current column we are scanning is not to the right of the guide token
-		while (cur_indent_level > 1 && curr_col <= indentStack[cur_indent_level - 1]) {
-			// then we pop guide (we move up one indentation layer)
-			popGuide();
-			// and mark that we need to emit an <auto-end> token
-			pendingAutoEnds++;
-		}
-	}
-
-	// Handle newline - reset column and set line start flag
-	static inline void handleNewLine() {
-		lineno++;
-		column = 1;
-		atLineStart = true;
-		yylloc.lines(yyleng);
-		yylloc.step();
-	}
-
-	// Escape processing functions
-	char processEscape(const char* text, int pos) {
-		char escape_char = text[pos + 1];
-		
-		switch (escape_char) {
-			case 'n':  return '\n';
-			case 't':  return '\t';
-			case 'r':  return '\r';
-			case '0':  return '\0';
-			case '\\': return '\\';
-			case '\'': return '\'';
-			case '"':  return '"';
-			case 'x':  // Hex escape \xnn
-				if (pos + 3 < strlen(text)) {
-					int val1 = (text[pos + 2] >= '0' && text[pos + 2] <= '9') ? text[pos + 2] - '0' :
-							   (text[pos + 2] >= 'a' && text[pos + 2] <= 'f') ? text[pos + 2] - 'a' + 10 :
-							   (text[pos + 2] >= 'A' && text[pos + 2] <= 'F') ? text[pos + 2] - 'A' + 10 : -1;
-					int val2 = (text[pos + 3] >= '0' && text[pos + 3] <= '9') ? text[pos + 3] - '0' :
-							   (text[pos + 3] >= 'a' && text[pos + 3] <= 'f') ? text[pos + 3] - 'a' + 10 :
-							   (text[pos + 3] >= 'A' && text[pos + 3] <= 'F') ? text[pos + 3] - 'A' + 10 : -1;
-					if (val1 != -1 && val2 != -1) {
-						return (char)(val1 * 16 + val2); // here returning ASCII char
-					}
-				}
-				fprintf(stderr, "Error: Invalid hex escape at line %d\n", lineno);
-				return 0;
-			default:
-				fprintf(stderr, "Warning: Unknown escape sequence \\%c at line %d\n", escape_char, lineno);
-				return escape_char;
-		}
-	}
-
-	std::string processStringEscapes(const char* input) {
-    	int len = std::strlen(input);
-    	std::string result;
-    	result.reserve(len); // avoids reallocations
-
-    	int i = 1; // Skip opening quote
-    	while (i < len - 1) { // Until before closing quote
-        	if (input[i] == '\\') {
-            	// Handle escape sequence
-            	char c = processEscape(input, i);
-            	result.push_back(c);
-
-            	// Skip over the escape sequence in the source text
-            	if (input[i + 1] == 'x')
-                	i += 4;   // \xNN
-            	else
-                	i += 2;   // \n, \t, etc.
-        	} else {
-            	result.push_back(input[i]);
-            	i++;
-        	}
-    	}
-
-    	return result;
-	}
-
+	static int indentStack[MAX_INDENT_LEVELS] = { -1 };
+	static int cur_indent_level = 1;
+	static int pendingAutoEnds = 0;
+	static bool atLineStart = true;
+	
+	/* Declaration of lexer helper functions */
+	static inline void pushGuide(const char* guide_name, int guide_col);
+	static inline void popGuide();
+	static inline void checkIndentation(int curr_col);
+	static inline void handleNewLine(parser::location_type& yylloc);
+	static inline char processEscape(const char* text, int pos);
+	static inline std::string processStringEscapes(const char* input);
 %}
 
 %option noyywrap nodefault
@@ -133,26 +40,28 @@ DIGIT [0-9]
 LETTER [a-zA-Z]
 ID_CHAR [a-zA-Z0-9_]
 
+%s PENDING
 %s COMMENT
 
 %%
 
-/* 0-width emission of pending AUTO_END, without consuming input */
-.|\n 					{
-	if (pendingAutoEnds > 0) {
-    	--pendingAutoEnds;
-    	return parser::token::T_AUTO_END;
-	}
-  	yyless(0); /* put char back; fall through to real rules */
+<PENDING>(.|\n) 		{
+  	yyless(0); /* put char back; DO NOT CONSUME */
+	--pendingAutoEnds;
+	if (pendingAutoEnds == 0) BEGIN(INITIAL);
+
+	return parser::token::T_AUTO_END;
 }
 
-/* Flush remaining AUTO_ENDs (due to guides) on EOF */
-<<EOF>> 				{
-	while (cur_indent_level > 1) {
-		popGuide();
-    	return parser::token::T_AUTO_END;
-  	}
-  	return 0; /* YYEOF */
+<INITIAL><<EOF>> 				{
+	if (cur_indent_level > 1) {
+		pendingAutoEnds = cur_indent_level - 1;
+		while (cur_indent_level > 1) popGuide();
+		BEGIN(PENDING);
+		yyless(0);
+	} else {
+		return 0;
+	}
 }
 
 "def"					{ 
@@ -321,7 +230,7 @@ ID_CHAR [a-zA-Z0-9_]
 				    atLineStart = false;
 				    BEGIN(INITIAL); }
 				 }
-<COMMENT>\n 	 { handleNewLine(); }
+<COMMENT>\n 	 { handleNewLine(*yylloc); }
 <COMMENT>"*" 	 { columno += 1; }
 <COMMENT>[^*\n]+ { columno += yyleng; }		//Track column if code follows
 <COMMENT><<EOF>> {
@@ -334,7 +243,7 @@ ID_CHAR [a-zA-Z0-9_]
 	if (atLineStart) checkIndentation(columno);
 	atLineStart = false;
 	columno += yyleng;
-	yylval.emplace<int>(std::stoi(yytext));
+	yylval->emplace<int>(std::stoi(yytext));
 	return parser::token::T_INT_CONST; 
 }
 
@@ -349,7 +258,7 @@ ID_CHAR [a-zA-Z0-9_]
 	else
 		c = yytext[1];
 
-	yylval.emplace<char>(c);
+	yylval->emplace<char>(c);
 	return parser::token::T_CHAR_CONST;
 }
 
@@ -359,7 +268,7 @@ ID_CHAR [a-zA-Z0-9_]
 	atLineStart = false;
 	columno += yyleng;
 
-	yylval.emplace<std::string>(yytext);
+	yylval->emplace<std::string>(yytext);
 	return parser::token::T_ID; 
 }
 
@@ -371,7 +280,7 @@ ID_CHAR [a-zA-Z0-9_]
 	columno += yyleng;
 	std::string s = processStringEscapes(yytext);
 	
-	yylval.emplace<std::string>(std::move(s));
+	yylval->emplace<std::string>(std::move(s));
 	return parser::token::T_STRING_CONST;
 }
 
@@ -440,9 +349,9 @@ ID_CHAR [a-zA-Z0-9_]
 [ ]+					{ columno += yyleng; /* ignore spaces but track column */ }
 \r						{ /* ignore carriage return */ }
 \t						{ columno += 8; /* assuming tab width of 8 */ }
-\n+						{ handleNewLine(); }
+\n+						{ handleNewLine(*yylloc); }
 
-#.*\n					{ handleNewLine(); }
+#.*\n					{ handleNewLine(*yylloc); }
 
 .						{ 
 	/* Error handling for illegal characters */
@@ -452,3 +361,105 @@ ID_CHAR [a-zA-Z0-9_]
 
 %%
 
+/* Implementation of lexer helper functions */
+
+// Guide token encountered (push)
+static inline void pushGuide (const char* guide_name, int guide_col) {
+	if (cur_indent_level >= MAX_INDENT_LEVELS) {
+		fprintf(stderr, "Error: Too many nested levels at line %d\n", lineno);
+		exit(1);
+	}
+
+	indentStack[cur_indent_level++] = guide_col;
+	//printf("Guide pushed: %s at column %d\n", guide_name, guide_col);
+}
+
+// Go up one indentation level. 2 possibilities for usage of this:
+// a. Next token is first in a new line and it is located in a column lefter than the column of the guide word
+// b. EOF encountered
+static inline void popGuide () {
+	if (cur_indent_level > 1) {
+		indentStack[--cur_indent_level] = -1;
+	}
+}
+
+// Check indentation status at line start
+static inline void checkIndentation (int curr_col) {
+	if (!atLineStart) return;
+
+	// condition: there are indentation layers and the current column we are scanning is not to the right of the guide token
+	while (cur_indent_level > 1 && curr_col <= indentStack[cur_indent_level - 1]) {
+		// then we pop guide (we move up one indentation layer)
+		popGuide();
+		// and mark that we need to emit an <auto-end> token
+		pendingAutoEnds++;
+		BEGIN(PENDING);
+	}
+}
+
+// Handle newline - reset column and set line start flag
+static inline void handleNewLine(parser::location_type& yylloc) {
+	lineno++;
+	columno = 1;
+	atLineStart = true;
+	yylloc.lines(yyleng);
+	yylloc.step();
+}
+
+// Escape processing functions
+static inline char processEscape(const char* text, int pos) {
+	char escape_char = text[pos + 1];
+	
+	switch (escape_char) {
+		case 'n':  return '\n';
+		case 't':  return '\t';
+		case 'r':  return '\r';
+		case '0':  return '\0';
+		case '\\': return '\\';
+		case '\'': return '\'';
+		case '"':  return '"';
+		case 'x':  // Hex escape \xnn
+			if (pos + 3 < strlen(text)) {
+				int val1 = (text[pos + 2] >= '0' && text[pos + 2] <= '9') ? text[pos + 2] - '0' :
+						   (text[pos + 2] >= 'a' && text[pos + 2] <= 'f') ? text[pos + 2] - 'a' + 10 :
+						   (text[pos + 2] >= 'A' && text[pos + 2] <= 'F') ? text[pos + 2] - 'A' + 10 : -1;
+				int val2 = (text[pos + 3] >= '0' && text[pos + 3] <= '9') ? text[pos + 3] - '0' :
+						   (text[pos + 3] >= 'a' && text[pos + 3] <= 'f') ? text[pos + 3] - 'a' + 10 :
+						   (text[pos + 3] >= 'A' && text[pos + 3] <= 'F') ? text[pos + 3] - 'A' + 10 : -1;
+				if (val1 != -1 && val2 != -1) {
+					return (char)(val1 * 16 + val2); // here returning ASCII char
+				}
+			}
+			fprintf(stderr, "Error: Invalid hex escape at line %d\n", lineno);
+			return 0;
+		default:
+			fprintf(stderr, "Warning: Unknown escape sequence \\%c at line %d\n", escape_char, lineno);
+			return escape_char;
+	}
+}
+
+static inline std::string processStringEscapes(const char* input) {
+	int len = std::strlen(input);
+	std::string result;
+	result.reserve(len); // avoids reallocations
+
+	int i = 1; // Skip opening quote
+	while (i < len - 1) { // Until before closing quote
+		if (input[i] == '\\') {
+			// Handle escape sequence
+			char c = processEscape(input, i);
+			result.push_back(c);
+
+			// Skip over the escape sequence in the source text
+			if (input[i + 1] == 'x')
+				i += 4;   // \xNN
+			else
+				i += 2;   // \n, \t, etc.
+		} else {
+			result.push_back(input[i]);
+			i++;
+		}
+	}
+
+	return result;
+}
