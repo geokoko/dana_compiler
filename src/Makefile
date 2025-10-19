@@ -5,7 +5,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -g
 BISON := bison
 BISONFLAGS := -Wall -d --skeleton=lalr1.cc
 FLEX := flex
-LEXFLAGS := --header-file=lexer.hpp
+LEXFLAGS := --header-file=frontend/lexer/lexer.hpp
 
 # Target executable
 TARGET = danac
@@ -22,6 +22,7 @@ LEXER_CPP = $(LEXER_DIR)/lexer.cpp
 LEXER_H = $(LEXER_DIR)/lexer.hpp
 PARSER_CPP = $(PARSER_DIR)/parser.tab.cc
 PARSER_HH = $(PARSER_DIR)/parser.tab.hh
+PARSER_LOC = $(PARSER_DIR)/location.hh
 
 SRCS := main.cpp $(AST_DIR)/ast.cpp $(AST_DIR)/ast_print.cpp $(PARSER_CPP) $(LEXER_CPP)
 OBJS := $(SRCS:.cpp=.o)
@@ -49,7 +50,8 @@ $(LEXER_CPP) $(LEXER_H): $(LEXER_DIR)/lexer.l
 clean:
 	rm -f $(OBJS) $(TARGET) \
 	      $(PARSER_CPP) $(PARSER_HH) \
-	      $(LEXER_CPP) $(LEXER_H)
+	      $(LEXER_CPP) $(LEXER_H) \
+		  $(PARSER_LOC)
 
 # Clean everything including the executable
 distclean: clean
