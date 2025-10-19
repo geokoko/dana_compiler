@@ -8,7 +8,7 @@ Stmt::Stmt(SourceLoc l) : ASTNode(l) {}
 
 Lval::Lval(SourceLoc l) : ASTNode(l) {}
 
-Rval::Rval(SourceLoc l) : ASTNode(l) {}
+Rval::Rval(SourceLoc l) : Expr(l) {}
 
 Type::Type(SourceLoc l, DataType b, vec<std::optional<int>> d)
     : ASTNode(l), base(b), dims(std::move(d)) {}
@@ -137,4 +137,27 @@ BinaryCond::BinaryCond(SourceLoc l, LogicOp operation, up<Cond> left, up<Cond> r
 RelCond::RelCond(SourceLoc l, RelOp operation, up<Expr> left, up<Expr> right)
     : Cond(l), op(operation), lhs(std::move(left)), rhs(std::move(right)) {}
 
-
+// ---- Default no-op semantic passes ----
+void ASTNode::sem() {}
+void Stmt::sem() {}
+void Lval::sem() {}
+void Type::sem() {}
+void Block::sem() {}
+void Def::sem() {}
+void FParType::sem() {}
+void FParDef::sem() {}
+void Header::sem() {}
+void VarDef::sem() {}
+void FuncDecl::sem() {}
+void FuncDef::sem() {}
+void LValueExpr::sem() {}
+void ParenExpr::sem() {}
+void FuncCall::sem() {}
+void UnaryExpr::sem() {}
+void BinaryExpr::sem() {}
+void IntConst::sem() {}
+void CharConst::sem() {}
+void TrueConst::sem() {}
+void FalseConst::sem() {}
+void Cond::sem() {}
+void Rval::sem() {}

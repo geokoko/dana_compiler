@@ -124,8 +124,8 @@ public:
     virtual void print(std::ostream& out) const override = 0;
 };
 
-// R-Values
-class Rval : public ASTNode {
+// R-Values are expressions
+class Rval : public Expr {
 public:
     explicit Rval(SourceLoc l);
     virtual ~Rval() override = default;
