@@ -114,44 +114,44 @@
 %%
 
 program
-	: func_def									{ $$ = make_unique<Program>(mkLoc(@$), move($1)); }			
+	: func_def									{ $$ = make_unique<Program>(mkLoc(@$), std::move($1)); }			
 	;
 
 func_def
-	: T_DEF header localdef_list block			{ $$ = make_unique<FuncDef>(mkLoc(@$), move($2), move($3), move($4)); }
+	: T_DEF header localdef_list block			{ $$ = make_unique<FuncDef>(mkLoc(@$), std::move($2), std::move($3), std::move($4)); }
 	;
 
 localdef_list
 	: %empty									{ $$ = vec<up<Def>>{}; }
-	| localdef_list local_def					{ $1.emplace_back(move($2)); $$ = move($1); }
+	| localdef_list local_def					{ $1.emplace_back(std::move($2)); $$ = std::move($1); }
 	;
 
 local_def
-	: func_def									{ $$ = move($1); } 
-	| func_decl 			                    { $$ = move($1); } 			
-	| var_def									{ $$ = move($1); } 
+	: func_def									{ $$ = std::move($1); } 
+	| func_decl 			                    { $$ = std::move($1); } 			
+	| var_def									{ $$ = std::move($1); } 
 	;
 
 func_decl
-	: T_DECL header								{ $$ = make_unique<FuncDecl>(mkLoc(@$), move($2)); }	
+	: T_DECL header								{ $$ = make_unique<FuncDecl>(mkLoc(@$), std::move($2)); }	
 	;
 
 var_def
-	: T_VAR id_list T_IS type					{ $$ = make_unique<VarDef>(mkLoc(@$), move($2), move($4)); }
+	: T_VAR id_list T_IS type					{ $$ = make_unique<VarDef>(mkLoc(@$), std::move($2), std::move($4)); }
 	;
 
 type
-	: T_INT  type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::Int,  move($2)); }
-	| T_BYTE type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::Byte, move($2)); }
+	: T_INT  type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::Int,  std::move($2)); }
+	| T_BYTE type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::Byte, std::move($2)); }
 	;
 
 type_dims
 	: %empty									{ $$ = vec<optional<int>>{}; }
-	| type_dims '[' T_INT_CONST ']'				{ $1.emplace_back($3); $$ = move($1); }
+	| type_dims '[' T_INT_CONST ']'				{ $1.emplace_back($3); $$ = std::move($1); }
 	;
 
 header
-	: T_ID opt_ret_type opt_params				{ $$ = make_unique<Header>(mkLoc(@$), move($1), $2, move($3)); }
+	: T_ID opt_ret_type opt_params				{ $$ = make_unique<Header>(mkLoc(@$), std::move($1), $2, std::move($3)); }
 	;
 
 opt_ret_type
@@ -162,21 +162,21 @@ opt_ret_type
 
 opt_params
 	: %empty									{ $$ = vec<up<FParDef>>{}; }
-	| ':' fpar_list								{ $$ = move($2); }
+	| ':' fpar_list								{ $$ = std::move($2); }
 	;
 
 fpar_list
-	: fpar_def               					{ vec<up<FParDef>> v; v.emplace_back(move($1)); $$ = move(v); }
-	| fpar_list ',' fpar_def 					{ $1.emplace_back(move($3)); $$ = move($1); }
+	: fpar_def               					{ vec<up<FParDef>> v; v.emplace_back(std::move($1)); $$ = std::move(v); }
+	| fpar_list ',' fpar_def 					{ $1.emplace_back(std::move($3)); $$ = std::move($1); }
 	;
 
 fpar_def
-	: id_list T_AS fpar_type 					{ $$ = make_unique<FParDef>(mkLoc(@$), move($1), move($3)); }
+	: id_list T_AS fpar_type 					{ $$ = make_unique<FParDef>(mkLoc(@$), std::move($1), std::move($3)); }
 	;
 
 id_list
-	: T_ID         								{ vec<string> v; v.emplace_back(move($1)); $$ = move(v); }
-	| id_list T_ID 								{ $1.emplace_back(move($2)); $$ = move($1); }
+	: T_ID         								{ vec<string> v; v.emplace_back(std::move($1)); $$ = std::move(v); }
+	| id_list T_ID 								{ $1.emplace_back(std::move($2)); $$ = std::move($1); }
 	;
 
 fpar_type
@@ -187,10 +187,10 @@ fpar_type
 		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */false, DataType::Byte);
 	  }
 	| T_INT fpar_dims {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Int, move($2)); 
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Int, std::move($2)); 
 	  }
 	| T_BYTE fpar_dims {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Byte, move($2));
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Byte, std::move($2));
 	  }
 	| T_REF T_INT {
 		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Int); 
@@ -201,92 +201,92 @@ fpar_type
 	;
 
 fpar_dims
-	: type_dims									{ $$ = move($1); }
-	| '[' ']' type_dims							{ auto v = move($3); v.insert(v.begin(), optional<int>{}); $$ = move(v); }
+	: '[' T_INT_CONST ']' type_dims				{ auto v = std::move($4); v.insert(v.begin(), $2); $$ = std::move(v); }
+	| '[' ']' type_dims							{ auto v = std::move($3); v.insert(v.begin(), optional<int>{}); $$ = std::move(v); }
 	;
 
 block
-	: T_BEGIN stmt_list T_END   				{ $$ = make_unique<Block>(mkLoc(@$), move($2) ); }
-	| stmt_list T_AUTO_END      				{ $$ = make_unique<Block>(mkLoc(@$), move($1) ); }
+	: T_BEGIN stmt_list T_END   				{ $$ = make_unique<Block>(mkLoc(@$), std::move($2) ); }
+	| stmt_list T_AUTO_END      				{ $$ = make_unique<Block>(mkLoc(@$), std::move($1) ); }
 	;
 
 stmt_list
-	: stmt                   					{ vec<up<Stmt>> v; v.emplace_back(move($1)); $$ = move(v); }
-	| stmt_list stmt            				{ $1.emplace_back(move($2)); $$ = move($1); }
+	: stmt                   					{ vec<up<Stmt>> v; v.emplace_back(std::move($1)); $$ = std::move(v); }
+	| stmt_list stmt            				{ $1.emplace_back(std::move($2)); $$ = std::move($1); }
 	;
 
 stmt
 	: T_SKIP                    				{ $$ = make_unique<SkipStmt>(mkLoc(@$)); }
-	| assign_stmt               				{ $$ = move($1); }
-	| proc_call                 				{ $$ = move($1); }
+	| assign_stmt               				{ $$ = std::move($1); }
+	| proc_call                 				{ $$ = std::move($1); }
 	| T_EXIT                    				{ $$ = make_unique<ExitStmt>(mkLoc(@$)); }
-	| return_stmt               				{ $$ = move($1); }
-	| if_stmt                   				{ $$ = move($1); }
-	| loop_stmt                 				{ $$ = move($1); }
-	| break_stmt                				{ $$ = move($1); }
-	| continue_stmt             				{ $$ = move($1); }
+	| return_stmt               				{ $$ = std::move($1); }
+	| if_stmt                   				{ $$ = std::move($1); }
+	| loop_stmt                 				{ $$ = std::move($1); }
+	| break_stmt                				{ $$ = std::move($1); }
+	| continue_stmt             				{ $$ = std::move($1); }
 	;
 
 assign_stmt
-	: l_value T_ASSIGN expr 					{ $$ = make_unique<AssignStmt>(mkLoc(@$), move($1), move($3)); }
+	: l_value T_ASSIGN expr 					{ $$ = make_unique<AssignStmt>(mkLoc(@$), std::move($1), std::move($3)); }
 	;
 
 return_stmt
-	: T_RET ':' expr 							{ $$ = make_unique<ReturnStmt>(mkLoc(@$), move($3)); }
+	: T_RET ':' expr 							{ $$ = make_unique<ReturnStmt>(mkLoc(@$), std::move($3)); }
 	;
 
 proc_call
-	: T_ID 										{ $$ = make_unique<ProcCall>(mkLoc(@$), move($1), vec<up<Expr>>{}); }
-	| T_ID ':' expr_list 						{ $$ = make_unique<ProcCall>(mkLoc(@$), move($1), move($3)); }
+	: T_ID 										{ $$ = make_unique<ProcCall>(mkLoc(@$), std::move($1), vec<up<Expr>>{}); }
+	| T_ID ':' expr_list 						{ $$ = make_unique<ProcCall>(mkLoc(@$), std::move($1), std::move($3)); }
 	;
 
 break_stmt
 	: T_BREAK              						{ $$ = make_unique<BreakStmt>(mkLoc(@$), optional<string>{}); }
-	| T_BREAK ':' T_ID     						{ $$ = make_unique<BreakStmt>(mkLoc(@$), optional<string>{move($3)}); }
+	| T_BREAK ':' T_ID     						{ $$ = make_unique<BreakStmt>(mkLoc(@$), optional<string>{std::move($3)}); }
 	;
 
 continue_stmt
 	: T_CONT               						{ $$ = make_unique<ContinueStmt>(mkLoc(@$), optional<string>{}); }
-	| T_CONT ':' T_ID      						{ $$ = make_unique<ContinueStmt>(mkLoc(@$), optional<string>{move($3)}); }
+	| T_CONT ':' T_ID      						{ $$ = make_unique<ContinueStmt>(mkLoc(@$), optional<string>{std::move($3)}); }
 	;
 
 if_stmt
-	: T_IF cond ':' block elif_list opt_else 	{ $$ = make_unique<IfStmt>(mkLoc(@$), move($2), move($4), move($5), move($6)); }
+	: T_IF cond ':' block elif_list opt_else 	{ $$ = make_unique<IfStmt>(mkLoc(@$), std::move($2), std::move($4), std::move($5), std::move($6)); }
 	;
 
 elif_list
 	: %empty									{ $$ = vec<std::pair<up<Cond>, up<Block>>>{}; }
-	| elif_list T_ELIF cond ':' block 			{ $1.emplace_back(std::make_pair(move($3), move($5))); $$ = move($1); }
+	| elif_list T_ELIF cond ':' block 			{ $1.emplace_back(std::make_pair(std::move($3), std::move($5))); $$ = std::move($1); }
 	;
 
 opt_else
 	: %empty									{ $$ = optional<up<Block>>{}; }
-	| T_ELSE ':' block        					{ $$ = optional<up<Block>>{ move($3) }; }
+	| T_ELSE ':' block        					{ $$ = optional<up<Block>>{ std::move($3) }; }
 	;
 
 loop_stmt
-	: T_LOOP opt_id ':' block 					{ $$ = make_unique<LoopStmt>(mkLoc(@$), move($2), move($4)); }
+	: T_LOOP opt_id ':' block 					{ $$ = make_unique<LoopStmt>(mkLoc(@$), std::move($2), std::move($4)); }
 	;
 
 opt_id
 	: %empty									{ $$ = optional<string>{}; }
-	| T_ID      								{ $$ = optional<string>{ move($1) }; }
+	| T_ID      								{ $$ = optional<string>{ std::move($1) }; }
 	;
 
 expr_list
-	: expr										{ vec<up<Expr>> v; v.emplace_back(move($1)); $$ = move(v); }				
-	| expr_list ',' expr						{ $1.emplace_back(move($3)); $$ = move($1); }
+	: expr										{ vec<up<Expr>> v; v.emplace_back(std::move($1)); $$ = std::move(v); }				
+	| expr_list ',' expr						{ $1.emplace_back(std::move($3)); $$ = std::move($1); }
 	;
 
 func_call
-	: T_ID '(' ')'								{ $$ = make_unique<FuncCall>(mkLoc(@$), move($1), vec<up<Expr>>{}); }
-	| T_ID '(' expr_list ')'					{ $$ = make_unique<FuncCall>(mkLoc(@$), move($1), move($3)); }
+	: T_ID '(' ')'								{ $$ = make_unique<FuncCall>(mkLoc(@$), std::move($1), vec<up<Expr>>{}); }
+	| T_ID '(' expr_list ')'					{ $$ = make_unique<FuncCall>(mkLoc(@$), std::move($1), std::move($3)); }
 	;
 
 l_value
-	: T_ID                  					{ $$ = make_unique<IdLVal>(mkLoc(@$), move($1) ); }
-	| T_STRING_CONST        					{ $$ = make_unique<StringLiteralLVal>(mkLoc(@$), move($1) ); }
-	| l_value '[' expr ']'  					{ $$ = make_unique<IndexLVal>(mkLoc(@$), move($1), move($3) ); }
+	: T_ID                  					{ $$ = make_unique<IdLVal>(mkLoc(@$), std::move($1) ); }
+	| T_STRING_CONST        					{ $$ = make_unique<StringLiteralLVal>(mkLoc(@$), std::move($1) ); }
+	| l_value '[' expr ']'  					{ $$ = make_unique<IndexLVal>(mkLoc(@$), std::move($1), std::move($3) ); }
 	;
 
 expr
@@ -294,31 +294,31 @@ expr
 	| T_CHAR_CONST          					{ $$ = make_unique<CharConst>(mkLoc(@$), (unsigned char)$1); }
 	| T_TRUE                					{ $$ = make_unique<TrueConst>(mkLoc(@$)); }
 	| T_FALSE               					{ $$ = make_unique<FalseConst>(mkLoc(@$)); }
-	| l_value               					{ $$ = make_unique<LValueExpr>(mkLoc(@$), move($1)); }
-	| '(' expr ')'          					{ $$ = make_unique<ParenExpr>(mkLoc(@$), move($2)); }
-	| func_call             					{ $$ = move($1); }
-	| '+' expr %prec UPLUS  					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Plus,  move($2)); }
-	| '-' expr %prec UMINUS 					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Minus, move($2)); }
-	| '!' expr              					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Not,  move($2)); }
-	| expr '+' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Add, move($1), move($3)); }
-	| expr '-' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Sub, move($1), move($3)); }
-	| expr '*' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mul, move($1), move($3)); }
-	| expr '/' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Div, move($1), move($3)); }
-	| expr '%' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mod, move($1), move($3)); }
-	| expr '&' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::AndBits, move($1), move($3)); }
-	| expr '|' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::OrBits,  move($1), move($3)); }
+	| l_value               					{ $$ = make_unique<LValueExpr>(mkLoc(@$), std::move($1)); }
+	| '(' expr ')'          					{ $$ = make_unique<ParenExpr>(mkLoc(@$), std::move($2)); }
+	| func_call             					{ $$ = std::move($1); }
+	| '+' expr %prec UPLUS  					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Plus,  std::move($2)); }
+	| '-' expr %prec UMINUS 					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Minus, std::move($2)); }
+	| '!' expr              					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Not,  std::move($2)); }
+	| expr '+' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Add, std::move($1), std::move($3)); }
+	| expr '-' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Sub, std::move($1), std::move($3)); }
+	| expr '*' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mul, std::move($1), std::move($3)); }
+	| expr '/' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Div, std::move($1), std::move($3)); }
+	| expr '%' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mod, std::move($1), std::move($3)); }
+	| expr '&' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::AndBits, std::move($1), std::move($3)); }
+	| expr '|' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::OrBits,  std::move($1), std::move($3)); }
 	;
 
 cond
-	: expr                  					{ $$ = make_unique<ExprCond>(mkLoc(@$), move($1)); }
-	| '(' cond ')'          					{ $$ = make_unique<ParenCond>(mkLoc(@$), move($2)); }
-	| T_NOT cond            					{ $$ = make_unique<NotCond>(mkLoc(@$), move($2)); }
-	| cond T_AND cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::And, move($1), move($3)); }
-	| cond T_OR  cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::Or,  move($1), move($3)); }
-	| expr '='  expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Eq, move($1), move($3)); }
-	| expr T_NE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ne, move($1), move($3)); }
-	| expr T_LE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Le, move($1), move($3)); }
-	| expr T_GE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ge, move($1), move($3)); }
-	| expr '<' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Lt, move($1), move($3)); }
-	| expr '>' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Gt, move($1), move($3)); }
+	: expr                  					{ $$ = make_unique<ExprCond>(mkLoc(@$), std::move($1)); }
+	//| '(' cond ')'          					{ $$ = make_unique<ParenCond>(mkLoc(@$), std::move($2)); }		//Restd::moved it due to conflict with '(' expr ')'
+	| T_NOT cond            					{ $$ = make_unique<NotCond>(mkLoc(@$), std::move($2)); }
+	| cond T_AND cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::And, std::move($1), std::move($3)); }
+	| cond T_OR  cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::Or,  std::move($1), std::move($3)); }
+	| expr '='  expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Eq, std::move($1), std::move($3)); }
+	| expr T_NE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ne, std::move($1), std::move($3)); }
+	| expr T_LE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Le, std::move($1), std::move($3)); }
+	| expr T_GE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ge, std::move($1), std::move($3)); }
+	| expr '<' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Lt, std::move($1), std::move($3)); }
+	| expr '>' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Gt, std::move($1), std::move($3)); }
 	;

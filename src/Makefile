@@ -15,7 +15,7 @@ FRONTEND_DIR = frontend
 LEXER_DIR = $(FRONTEND_DIR)/lexer
 PARSER_DIR = $(FRONTEND_DIR)/parser
 AST_DIR = $(FRONTEND_DIR)/ast
-TEST_DIR = ../tests
+TEST_DIR = ../tests/programs
 
 # Generated files
 LEXER_CPP = $(LEXER_DIR)/lexer.cpp
@@ -60,10 +60,10 @@ distclean: clean
 # Test targets - using test programs from tests/ directory
 test: $(TARGET)
 	@echo "Testing with hello.dana..."
-	./$(TARGET) < $(TEST_DIR)/hello.dana
+	./$(TARGET) $(TEST_DIR)/hello.dana
 
 test-hanoi: $(TARGET)
 	@echo "Testing with hanoi.dana..."
-	./$(TARGET) < $(TEST_DIR)/hanoi.dana
+	./$(TARGET) $(TEST_DIR)/hanoi.dana
 
 .PHONY: all clean distclean test test-hanoi 
