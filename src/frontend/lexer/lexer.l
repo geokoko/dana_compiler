@@ -393,6 +393,9 @@ static inline void checkIndentation (int curr_col) {
 		popGuide();
 		// and mark that we need to emit an <auto-end> token
 		pendingAutoEnds++;
+	}
+
+	if (pendingAutoEnds > 0) {
 		BEGIN(PENDING);
 	}
 }
