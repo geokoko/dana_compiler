@@ -42,7 +42,7 @@
 	static inline std::string processStringEscapes(const char* input);
 %}
 
-%option noyywrap nodefault
+%option noyywrap nodefault nounput
 
 DIGIT [0-9]
 LETTER [a-zA-Z]
@@ -389,6 +389,7 @@ ID_CHAR [a-zA-Z0-9_]
 
 // Guide token encountered (push)
 static inline void pushGuide (const char* guide_name, int guide_col) {
+	(void)guide_name;
 	if (cur_indent_level >= MAX_INDENT_LEVELS) {
 		fprintf(stderr, "Error: Too many nested levels at line %d\n", lineno);
 		exit(1);
@@ -438,7 +439,8 @@ static inline void handleNewLine(parser::location_type& yylloc) {
 
 // Escape processing functions
 static inline char processEscape(const char* text, int pos) {
-	char escape_char = text[pos + 1];
+		char escape_char = text[pos + 1];
+		size_t text_len = std::strlen(text);
 	
 	switch (escape_char) {
 		case 'n':  return '\n';
@@ -449,7 +451,7 @@ static inline char processEscape(const char* text, int pos) {
 		case '\'': return '\'';
 		case '"':  return '"';
 		case 'x':  // Hex escape \xnn
-			if (pos + 3 < strlen(text)) {
+				if ((size_t)pos + 3 < text_len) {
 				int val1 = (text[pos + 2] >= '0' && text[pos + 2] <= '9') ? text[pos + 2] - '0' :
 						   (text[pos + 2] >= 'a' && text[pos + 2] <= 'f') ? text[pos + 2] - 'a' + 10 :
 						   (text[pos + 2] >= 'A' && text[pos + 2] <= 'F') ? text[pos + 2] - 'A' + 10 : -1;

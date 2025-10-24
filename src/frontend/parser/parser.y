@@ -40,7 +40,7 @@
     	return SourceLoc{ (int)L.begin.line, (int)L.begin.column };
 	}
 
-	static void yyerror (const dana::parser::location_type& loc, const std::string& msg) {
+	static void __attribute__((unused)) yyerror (const dana::parser::location_type& loc, const std::string& msg) {
 		SourceLoc here{ (int)loc.begin.line, (int)loc.begin.column };
 		std::cerr << here.line << ':' << here.col << ": " << msg << '\n';
 	}
@@ -106,7 +106,7 @@
 /* Define operator precedence */
 %left '|' T_OR
 %left '&' T_AND
-%nonassoc '=' T_NE '<' '>' T_LE T_GE
+
 %left '+' '-'
 %left '*' '/' '%'
 %precedence UPLUS UMINUS '!' T_NOT
