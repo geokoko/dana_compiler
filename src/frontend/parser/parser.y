@@ -16,7 +16,6 @@
 	#include "../ast/ast.hpp"
 
 	/* Handy aliases */
-	using std::move;
 	using std::make_unique;
 	using std::string;
 	using std::optional;
@@ -118,7 +117,9 @@ program
 	;
 
 func_def
-	: T_DEF header localdef_list block			{ $$ = make_unique<FuncDef>(mkLoc(@$), std::move($2), std::move($3), std::move($4)); }
+	: T_DEF header localdef_list block			{ 
+		$$ = make_unique<FuncDef>(mkLoc(@$), std::move($2), std::move($3), std::move($4)); 
+	}
 	;
 
 localdef_list
@@ -201,8 +202,12 @@ fpar_type
 	;
 
 fpar_dims
-	: '[' T_INT_CONST ']' type_dims				{ auto v = std::move($4); v.insert(v.begin(), $2); $$ = std::move(v); }
-	| '[' ']' type_dims							{ auto v = std::move($3); v.insert(v.begin(), optional<int>{}); $$ = std::move(v); }
+	: '[' T_INT_CONST ']' type_dims				{ 
+		auto v = std::move($4); v.insert(v.begin(), $2); $$ = std::move(v); 
+	}
+	| '[' ']' type_dims							{ 
+		auto v = std::move($3); v.insert(v.begin(), optional<int>{}); $$ = std::move(v); 
+	}
 	;
 
 block
@@ -251,12 +256,16 @@ continue_stmt
 	;
 
 if_stmt
-	: T_IF cond ':' block elif_list opt_else 	{ $$ = make_unique<IfStmt>(mkLoc(@$), std::move($2), std::move($4), std::move($5), std::move($6)); }
+	: T_IF cond ':' block elif_list opt_else 	{ 
+		$$ = make_unique<IfStmt>(mkLoc(@$), std::move($2), std::move($4), std::move($5), std::move($6)); 
+	}
 	;
 
 elif_list
 	: %empty									{ $$ = vec<std::pair<up<Cond>, up<Block>>>{}; }
-	| elif_list T_ELIF cond ':' block 			{ $1.emplace_back(std::make_pair(std::move($3), std::move($5))); $$ = std::move($1); }
+	| elif_list T_ELIF cond ':' block 			{ 
+		$1.emplace_back(std::make_pair(std::move($3), std::move($5))); $$ = std::move($1); 
+	}
 	;
 
 opt_else
@@ -274,7 +283,7 @@ opt_id
 	;
 
 expr_list
-	: expr										{ vec<up<Expr>> v; v.emplace_back(std::move($1)); $$ = std::move(v); }				
+	: expr										{ vec<up<Expr>> v; v.emplace_back(std::move($1)); $$ = std::move(v); }
 	| expr_list ',' expr						{ $1.emplace_back(std::move($3)); $$ = std::move($1); }
 	;
 
@@ -300,25 +309,56 @@ expr
 	| '+' expr %prec UPLUS  					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Plus,  std::move($2)); }
 	| '-' expr %prec UMINUS 					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Minus, std::move($2)); }
 	| '!' expr              					{ $$ = make_unique<UnaryExpr>(mkLoc(@$), UnOp::Not,  std::move($2)); }
-	| expr '+' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Add, std::move($1), std::move($3)); }
-	| expr '-' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Sub, std::move($1), std::move($3)); }
-	| expr '*' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mul, std::move($1), std::move($3)); }
-	| expr '/' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Div, std::move($1), std::move($3)); }
-	| expr '%' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mod, std::move($1), std::move($3)); }
-	| expr '&' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::AndBits, std::move($1), std::move($3)); }
-	| expr '|' expr         					{ $$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::OrBits,  std::move($1), std::move($3)); }
+	| expr '+' expr         					{ 
+		$$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Add, std::move($1), std::move($3));
+	}
+	| expr '-' expr         					{ 
+		$$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Sub, std::move($1), std::move($3)); 
+	}
+	| expr '*' expr         					{
+		$$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mul, std::move($1), std::move($3)); 
+	}
+	| expr '/' expr         					{ 
+		$$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Div, std::move($1), std::move($3)); 
+	}
+	| expr '%' expr         					{ 
+		$$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::Mod, std::move($1), std::move($3)); 
+	}
+	| expr '&' expr         					{ 
+		$$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::AndBits, std::move($1), std::move($3)); 
+	}
+	| expr '|' expr         					{ 
+		$$ = make_unique<BinaryExpr>(mkLoc(@$), BinOp::OrBits,  std::move($1), std::move($3)); 
+	}
 	;
 
 cond
 	: expr                  					{ $$ = make_unique<ExprCond>(mkLoc(@$), std::move($1)); }
-	//| '(' cond ')'          					{ $$ = make_unique<ParenCond>(mkLoc(@$), std::move($2)); }		//Restd::moved it due to conflict with '(' expr ')'
+	// | '(' cond ')'          					{ $$ = make_unique<ParenCond>(mkLoc(@$), std::move($2)); }		
+	// Removed it due to conflict with '(' expr ')'
 	| T_NOT cond            					{ $$ = make_unique<NotCond>(mkLoc(@$), std::move($2)); }
-	| cond T_AND cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::And, std::move($1), std::move($3)); }
-	| cond T_OR  cond       					{ $$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::Or,  std::move($1), std::move($3)); }
-	| expr '='  expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Eq, std::move($1), std::move($3)); }
-	| expr T_NE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ne, std::move($1), std::move($3)); }
-	| expr T_LE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Le, std::move($1), std::move($3)); }
-	| expr T_GE expr        					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ge, std::move($1), std::move($3)); }
-	| expr '<' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Lt, std::move($1), std::move($3)); }
-	| expr '>' expr         					{ $$ = make_unique<RelCond>(mkLoc(@$), RelOp::Gt, std::move($1), std::move($3)); }
+	| cond T_AND cond       					{ 
+		$$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::And, std::move($1), std::move($3)); 
+	}
+	| cond T_OR cond       						{ 
+		$$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::Or,  std::move($1), std::move($3)); 
+	}
+	| expr '=' expr        						{ 
+		$$ = make_unique<RelCond>(mkLoc(@$), RelOp::Eq, std::move($1), std::move($3)); 
+	}
+	| expr T_NE expr        					{ 
+		$$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ne, std::move($1), std::move($3)); 
+	}
+	| expr T_LE expr        					{ 
+		$$ = make_unique<RelCond>(mkLoc(@$), RelOp::Le, std::move($1), std::move($3)); 
+	}
+	| expr T_GE expr        					{ 
+		$$ = make_unique<RelCond>(mkLoc(@$), RelOp::Ge, std::move($1), std::move($3)); 
+	}
+	| expr '<' expr         					{ 
+		$$ = make_unique<RelCond>(mkLoc(@$), RelOp::Lt, std::move($1), std::move($3)); 
+	}
+	| expr '>' expr         					{ 
+		$$ = make_unique<RelCond>(mkLoc(@$), RelOp::Gt, std::move($1), std::move($3)); 
+	}
 	;
