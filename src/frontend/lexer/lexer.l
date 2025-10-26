@@ -48,18 +48,18 @@ DIGIT [0-9]
 LETTER [a-zA-Z]
 ID_CHAR [a-zA-Z0-9_]
 
-%s PENDING
-%s COMMENT
+%x PENDING
+%x COMMENT
 
 %%
 
 <PENDING>(.|\n) 		{
   	printf("I AM IN PENDING STATE\n");
-	yyless(0); /* put char back; DO NOT CONSUME */
+	yyless(0); 							/* put char back; DO NOT CONSUME */
 	if (--pendingAutoEnds == 0) {
-		BEGIN(INITIAL); /* leave PENDING state */
-		return yylex(yylval, yylloc); /* rescan from the same position in INITIAL, */
-									/* so the *real* next token is parsed and returned */
+		BEGIN(INITIAL); 				/* leave PENDING state */
+		return yylex(yylval, yylloc); 	/* rescan from the same position in INITIAL, */
+										/* so the *real* next token is parsed and returned */
 	}	
 
 	return parser::token::T_AUTO_END;		
@@ -408,12 +408,12 @@ static inline void popGuide () {
 	}
 }
 
-// Check indentation status at line start
-static inline bool checkIndentation (int curr_col) {
+// Check indentation status at next line start
+static inline bool checkIndentation (int cur_col) {
 	if (!atLineStart) return false;
 
 	// condition: there are indentation layers and the current column we are scanning is not to the right of the guide token
-	while (cur_indent_level > 1 && curr_col <= indentStack[cur_indent_level - 1]) {
+	while (cur_indent_level > 1 && cur_col <= indentStack[cur_indent_level - 1]) {
 		// then we pop guide (we move up one indentation layer)
 		popGuide();
 		// and mark that we need to emit an <auto-end> token
@@ -428,7 +428,7 @@ static inline bool checkIndentation (int curr_col) {
 	return false;
 }
 
-// Handle newline - reset column and set line start flag
+// Handle newline - reset column and set line start flag - also check if auto-end must be emitted - if yes emit
 static inline void handleNewLine(parser::location_type& yylloc) {
 	lineno++;
 	columno = 1;
