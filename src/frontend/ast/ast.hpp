@@ -95,7 +95,11 @@ inline std::ostream& operator<<(std::ostream& out, const ASTNode& node) {
     return out;
 }
 
-/* Base classes in the hierarchy, directly derived from ASTNode */
+/* Base classes in the hierarchy, directly derived from ASTNode 
+ * Each node class stores certain attributes. The pointer attributes (up=unique_ptr)
+ * are the actual children nodes of a node in the AST. The other are just attributes
+ * that uniquely define an AST node.
+ * */
 
 // Expression nodes
 class Expr : public ASTNode {
@@ -115,7 +119,7 @@ public:
     virtual void print(std::ostream& out) const override = 0;
 };
 
-// L-values
+// L-values - the left part of an assignment statement
 class Lval : public ASTNode {
 public:
     explicit Lval(SourceLoc l);
@@ -124,7 +128,7 @@ public:
     virtual void print(std::ostream& out) const override = 0;
 };
 
-// R-Values are expressions
+// R-Values are expressions - the right part of an assignment statement
 class Rval : public Expr {
 public:
     explicit Rval(SourceLoc l);
@@ -194,11 +198,10 @@ public:
 class FParDef : public Def {
 protected:
     vec<string> identifiers;
-    up<FParType> type;
+	up<FParType> type;
 
 public:
     FParDef(SourceLoc l, vec<string> names, up<FParType> t);
-
     void sem() override;
     void print(std::ostream& out) const override;
 };

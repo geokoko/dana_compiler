@@ -6,6 +6,9 @@
 %locations
 %start program
 
+/* Pass the AST root back to the caller */
+%parse-param { up<Program>& ast_root }
+
 %code requires {
 	#include <memory>
 	#include <string>
@@ -113,7 +116,12 @@
 %%
 
 program
-	: func_def									{ $$ = make_unique<Program>(mkLoc(@$), std::move($1)); }			
+	: func_def									{ 
+		/* Build Program node and move it to the caller-owned ast_root */
+		ast_root = make_unique<Program>(mkLoc(@$), std::move($1));
+		/* Start symbol's semantic value is not used further */
+		$$ = up<Program>{};
+	}			
 	;
 
 func_def
