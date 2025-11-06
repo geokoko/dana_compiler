@@ -9,6 +9,7 @@
 class SymbolTable {
 public:
     SymbolTable();
+	~SymbolTable();
 
     void pushScope();
     void popScope();
