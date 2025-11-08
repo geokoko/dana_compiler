@@ -18,7 +18,8 @@ public:
     const Scope& current() const;
 
     Symbol* lookup(const std::string& id) const;
+	void insert(Symbol& s);
 
 private:
-    std::vector<std::unique_ptr<Scope>> scopes_;
+    std::vector<std::unique_ptr<Scope>> scopes_; //stack
 };

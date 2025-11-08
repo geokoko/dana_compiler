@@ -32,3 +32,7 @@ const Scope& SymbolTable::current() const {
 Symbol* SymbolTable::lookup(const std::string& id) const {
     return scopes_.empty() ? nullptr : scopes_.back()->lookup(id);
 }
+
+bool SymbolTable::insert(Symbol& s) {
+	scopes_.back()->declare(s);
+}

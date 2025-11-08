@@ -10,7 +10,7 @@ class Scope {
 public:
     explicit Scope(Scope* parent = nullptr);
 
-    bool declare(std::unique_ptr<Symbol> symbol);
+	void declare(Symbol& s);
     Symbol* lookupLocal(const std::string& id) const;
     Symbol* lookup(const std::string& id) const;
     Scope* parent() const noexcept;
