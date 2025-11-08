@@ -106,12 +106,12 @@
 %type <optional<string>> 					opt_id	// optional identifier
 
 /* Define operator precedence */
-%left '|' T_OR
-%left '&' T_AND
-
-%left '+' '-'
-%left '*' '/' '%'
 %precedence UPLUS UMINUS '!' T_NOT
+%left '&' T_AND
+%left '|' T_OR
+%left '*' '/' '%'
+%left '+' '-'
+%nonassoc '=' T_NE T_LE T_GE '<' '>'
 
 %%
 

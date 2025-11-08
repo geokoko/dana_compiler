@@ -62,7 +62,7 @@ class Stmt : public ASTNode {
 public:
     explicit Stmt(SourceLoc l);
     virtual ~Stmt() override = default;
-    void sem() override;
+    void sem() override = 0;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -71,7 +71,7 @@ class Lval : public ASTNode {
 public:
     explicit Lval(SourceLoc l);
     virtual ~Lval() override = default;
-    void sem() override;
+    void sem() override = 0;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -80,7 +80,7 @@ class Rval : public Expr {
 public:
     explicit Rval(SourceLoc l);
     virtual ~Rval() override = default;
-    void sem() override;
+    void sem() override = 0;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -93,8 +93,21 @@ protected:
 
 public:
     Type(SourceLoc l, TypeKind b, vec<std::optional<int>> d = {});
-    TypeKind data_type() const;
+    virtual ~Type() override = default;
+	TypeKind data_type() const;
     const vec<std::optional<int>>& dimensions() const;
+
+    virtual void sem() override = 0;
+    virtual void print(std::ostream& out) const override;
+};
+
+class FParType : public Type {
+protected:
+    bool by_ref;
+
+public:
+    FParType(SourceLoc l, bool ref, TypeKind type);
+    FParType(SourceLoc l, bool ref, TypeKind type, vec<std::optional<int>> d);
 
     void sem() override;
     void print(std::ostream& out) const override;
@@ -115,7 +128,7 @@ public:
 class Def : public ASTNode {
 public:
     explicit Def(SourceLoc l);
-    void sem() override;
+    virtual void sem() override = 0;
     void print(std::ostream& out) const override;
 };
 
@@ -130,17 +143,6 @@ public:
 };
 
 // ===== High-level program and definition nodes =====
-class FParType : public Type {
-protected:
-    bool by_ref;
-
-public:
-    FParType(SourceLoc l, bool ref, TypeKind type);
-    FParType(SourceLoc l, bool ref, TypeKind type, vec<std::optional<int>> d);
-
-    void sem() override;
-    void print(std::ostream& out) const override;
-};
 
 class FParDef : public Def {
 protected:
@@ -167,7 +169,7 @@ public:
 };
 
 class VarDef : public Def {
-protected:
+private:
     vec<string> names;
     up<Type> declared_type;
 
@@ -224,6 +226,7 @@ protected:
 public:
     AssignStmt(SourceLoc l, up<Lval> left, up<Expr> right);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 class ReturnStmt : public Stmt {
@@ -233,6 +236,7 @@ protected:
 public:
     ReturnStmt(SourceLoc l, up<Expr> expr);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 class ProcCall : public Stmt {
@@ -243,6 +247,7 @@ protected:
 public:
     ProcCall(SourceLoc l, string id, vec<up<Expr>> a);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 class BreakStmt : public Stmt {
@@ -252,6 +257,7 @@ protected:
 public:
     BreakStmt(SourceLoc l, optional<string> lbl);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 class ContinueStmt : public Stmt {
@@ -261,6 +267,7 @@ protected:
 public:
     ContinueStmt(SourceLoc l, optional<string> lbl);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 // need to forward declare Cond for IfStmt
@@ -279,6 +286,7 @@ public:
            vec<std::pair<up<Cond>, up<Block>>> elifs,
            std::optional<up<Block>> else_block);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 class LoopStmt : public Stmt {
@@ -288,6 +296,7 @@ public:
 
     LoopStmt(SourceLoc l, std::optional<string> lbl, up<Block> blk);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 // ===== L-values =====
@@ -299,6 +308,7 @@ private:
 public:
     IdLVal(SourceLoc l, string id);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 class StringLiteralLVal : public Lval {
@@ -308,6 +318,7 @@ private:
 public:
     StringLiteralLVal(SourceLoc l, string v);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 class IndexLVal : public Lval {
@@ -318,6 +329,7 @@ protected:
 public:
     IndexLVal(SourceLoc l, up<Lval> b, up<Expr> idx);
     void print(std::ostream& out) const override;
+	void sem() override;
 };
 
 // ===== R-values =====
