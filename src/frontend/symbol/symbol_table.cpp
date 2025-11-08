@@ -4,15 +4,15 @@
 #include <memory>
 
 SymbolTable::SymbolTable() {
-    pushScope();
+    openScope();
 }
 
-void SymbolTable::pushScope() {
+void SymbolTable::openScope() {
     Scope* parent = scopes_.empty() ? nullptr : scopes_.back().get();
     scopes_.push_back(std::make_unique<Scope>(parent));
 }
 
-void SymbolTable::popScope() {
+void SymbolTable::closeScope() {
     if (scopes_.empty()) {
         return;
     }

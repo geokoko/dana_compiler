@@ -11,8 +11,8 @@ public:
     SymbolTable();
 	~SymbolTable();
 
-    void pushScope();
-    void popScope();
+    void openScope();
+    void closeScope();
 
     Scope& current();
     const Scope& current() const;

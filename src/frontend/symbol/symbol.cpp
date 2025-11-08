@@ -2,21 +2,18 @@
 
 #include <utility>
 
-Symbol::Symbol(std::string name, SymKind kind, SemaType type, const ASTNode* declaration)
-    : name_(std::move(name)), kind_(kind), type_(std::move(type)), declaration_(declaration) {}
+Symbol::Symbol(const std::string name, SymKind kind, SemaType* type, SourceLoc loc)
+    : name_(name), kind_(kind), type_(type), loc_(loc) {}
 
-const std::string& Symbol::name() const noexcept {
+const std::string& Symbol::name() const {
     return name_;
 }
 
-SymKind Symbol::kind() const noexcept {
+SymKind Symbol::getSymKind() const {
     return kind_;
 }
 
-const SemaType& Symbol::type() const noexcept {
+const SemaType* Symbol::getType() const {
     return type_;
 }
 
-const ASTNode* Symbol::declaration() const noexcept {
-    return declaration_;
-}
