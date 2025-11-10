@@ -1,4 +1,5 @@
 #include "../ast/ast.hpp"
+#include "sema_context.hpp"
 
 // Semantic analysis functions for AST nodes
 // Each sem() function performs semantic checks and type resolution

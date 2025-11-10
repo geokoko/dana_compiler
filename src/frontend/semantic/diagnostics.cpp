@@ -1,26 +1,53 @@
 #include "diagnostics.hpp"
 
-bool Diagnostics::hasErrors() const {
-	return !messages_.empty();
+#include <iostream>
+
+namespace {
+	const char* toString(Diagnostics::Severity s) {
+		switch (s) {
+			case Diagnostics::Severity::Info: return "info";
+			case Diagnostics::Severity::Warning: return "warning";
+			case Diagnostics::Severity::Error: return "error";
+		}
+		return "?";
+	}
+
+	const char* toString(Diagnostics::Phase p) {
+		switch (p) {
+			case Diagnostics::Phase::Lexing: return "lexing";
+			case Diagnostics::Phase::Parsing: return "parsing";
+			case Diagnostics::Phase::Semantic: return "semantic";
+		}
+		return "?";
+	}
 }
 
-void Diagnostics::report(Severity severity, Phase phase, const std::string& message) {
-	std::string prefix;
-	switch (phase) {
-		case Phase::LEXING: prefix += "[LEXING] "; break;
-		case Phase::PARSING: prefix += "[PARSING] "; break;
-		case Phase::SEMANTIC_ANALYSIS: prefix += "[SEMANTIC_ANALYSIS] "; break;
+void Diagnostics::report(Severity severity, Phase phase, const SourceLoc& loc, const std::string& message) {
+	messages_.push_back(Entry{severity, phase, loc, message});
+}
+
+void Diagnostics::error(const SourceLoc& loc, const std::string& message) {
+	report(Severity::Error, Phase::Semantic, loc, message);
+}
+
+bool Diagnostics::hasErrors() const {
+	for (const auto& entry : messages_) {
+		if (entry.severity == Severity::Error) {
+			return true;
+		}
 	}
-	switch (severity) {
-		case Severity::INFO: prefix = "[INFO] "; break;
-		case Severity::WARNING: prefix = "[WARNING] "; break;
-		case Severity::ERROR: prefix = "[ERROR] "; break;
-	}
-	messages_.push_back(prefix + message);
+	return false;
+}
+
+const std::vector<Diagnostics::Entry>& Diagnostics::entries() const {
+	return messages_;
 }
 
 void Diagnostics::printAll() const {
-	for (const auto& msg : messages_) {
-		std::cout << msg << std::endl;
+	for (const auto& entry : messages_) {
+		std::cout << entry.loc.line << ':' << entry.loc.col << " ["
+		          << toString(entry.phase) << "] "
+		          << toString(entry.severity) << ": "
+		          << entry.message << '\n';
 	}
 }
