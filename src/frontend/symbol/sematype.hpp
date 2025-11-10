@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstddef>
-#include <vector>
+#include <memory>
+#include <optional>
 #include <utility>
+#include <vector>
 
 class SemaType {
 public:
@@ -30,6 +32,8 @@ private:
 	TypeKind kind_;
 };
 
+using SemaTypePtr = std::shared_ptr<const SemaType>;
+
 // ---------- Primitive types ----------
 
 class IntType : public SemaType {
@@ -50,32 +54,36 @@ public:
 
 class ArrayType : public SemaType {
 public:
-    ArrayType(const SemaType* elementType, std::size_t size);
+    ArrayType(SemaTypePtr elementType, std::optional<std::size_t> size);
 
-    const SemaType* elementType() const;
-    std::size_t size() const;
+    const SemaTypePtr& elementType() const;
+    std::optional<std::size_t> size() const;
 
     bool equals(const SemaType& other) const override;
 
 private:
-    const SemaType* elem_;
-    std::size_t size_;
+    SemaTypePtr elem_;
+    std::optional<std::size_t> size_;
 };
 
 // ---------- Function type ----------
 
 class FuncType : public SemaType {
 public:
-    FuncType(const SemaType* returnType, std::vector<std::pair<const SemaType*, ParamPass>> paramTypes);
-    const SemaType* returnType() const;
-    const std::vector<const SemaType*>& paramTypes() const;
+    using Param = std::pair<SemaTypePtr, ParamPass>;
+
+    FuncType(SemaTypePtr returnType, std::vector<Param> params);
+
+    const SemaTypePtr& returnType() const;
+    const std::vector<Param>& params() const;
     const std::vector<ParamPass>& paramPasses() const;
 
     bool equals(const SemaType& other) const override;
 
 private:
-    const SemaType* ret_;
-	std::vector<std::pair<const SemaType*, ParamPass>> paramTypes_;
+    SemaTypePtr ret_;
+	std::vector<Param> params_;
+    std::vector<ParamPass> passes_;
 };
 
 // ---------- Void type (for procs / "no value") ----------
@@ -87,3 +95,9 @@ public:
     bool equals(const SemaType& other) const override;
 };
 
+// Factory helpers
+SemaTypePtr makeIntType();
+SemaTypePtr makeByteType();
+SemaTypePtr makeVoidType();
+SemaTypePtr makeArrayType(SemaTypePtr element, std::optional<std::size_t> size);
+SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<FuncType::Param> params);

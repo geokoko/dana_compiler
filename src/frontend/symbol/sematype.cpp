@@ -1,5 +1,7 @@
 #include "sematype.hpp"
 
+#include <utility>
+
 // ===================== SemaType base =====================
 
 SemaType::SemaType(TypeKind kind)
@@ -23,16 +25,16 @@ bool ByteType::equals(const SemaType& other) const {
 
 // ===================== ArrayType =====================
 
-ArrayType::ArrayType(const SemaType* elementType, std::size_t size)
+ArrayType::ArrayType(SemaTypePtr elementType, std::optional<std::size_t> size)
 	: SemaType(TypeKind::ARRAY),
-	  elem_(elementType),
+	  elem_(std::move(elementType)),
 	  size_(size) {}
 
-const SemaType* ArrayType::elementType() const {
+const SemaTypePtr& ArrayType::elementType() const {
 	return elem_;
 }
 
-std::size_t ArrayType::size() const {
+std::optional<std::size_t> ArrayType::size() const {
 	return size_;
 }
 
@@ -45,6 +47,7 @@ bool ArrayType::equals(const SemaType& other) const {
 	if (size_ != o.size_) {
 		return false;
 	}
+
 	if (!elem_ || !o.elem_) {
 		return elem_ == o.elem_;
 	}
@@ -53,13 +56,26 @@ bool ArrayType::equals(const SemaType& other) const {
 
 // ===================== FuncType =====================
 
-FuncType::FuncType(const SemaType* returnType, std::vector<std::pair<const SemaType*, ParamPass>> paramTypes)
+FuncType::FuncType(SemaTypePtr returnType, std::vector<Param> params)
 	: SemaType(TypeKind::FUNC),
-	  ret_(returnType),
-	  paramTypes_(std::move(paramTypes)) {}
+	  ret_(std::move(returnType)),
+	  params_(std::move(params)) {
+	passes_.reserve(params_.size());
+	for (const auto& param : params_) {
+		passes_.push_back(param.second);
+	}
+}
 
-const SemaType* FuncType::returnType() const {
+const SemaTypePtr& FuncType::returnType() const {
 	return ret_;
+}
+
+const std::vector<FuncType::Param>& FuncType::params() const {
+	return params_;
+}
+
+const std::vector<SemaType::ParamPass>& FuncType::paramPasses() const {
+	return passes_;
 }
 
 bool FuncType::equals(const SemaType& other) const {
@@ -68,7 +84,6 @@ bool FuncType::equals(const SemaType& other) const {
 	}
 	const auto& o = static_cast<const FuncType&>(other);
 
-	// Compare return types (nullptr = void)
 	if (!ret_ || !o.ret_) {
 		if (ret_ != o.ret_) {
 			return false;
@@ -77,25 +92,23 @@ bool FuncType::equals(const SemaType& other) const {
 		return false;
 	}
 
-	// Compare parameter count
-	if (paramTypes_.size() != o.paramTypes_.size()) {
+	if (params_.size() != o.params_.size()) {
 		return false;
 	}
 
-	// Compare each parameter type and passing mode
-	for (std::size_t i = 0; i < paramTypes_.size(); ++i) {
-		const auto& a = paramTypes_[i];
-		const auto& b = o.paramTypes_[i];
+	for (std::size_t i = 0; i < params_.size(); ++i) {
+		const auto& lhs = params_[i];
+		const auto& rhs = o.params_[i];
 
-		if (a.second != b.second) {
+		if (lhs.second != rhs.second) {
 			return false;
 		}
 
-		if (!a.first || !b.first) {
-			if (a.first != b.first) {
+		if (!lhs.first || !rhs.first) {
+			if (lhs.first != rhs.first) {
 				return false;
 			}
-		} else if (!a.first->equals(*b.first)) {
+		} else if (!lhs.first->equals(*rhs.first)) {
 			return false;
 		}
 	}
@@ -109,3 +122,34 @@ bool VoidType::equals(const SemaType& other) const {
 	return other.getKind() == TypeKind::VOID;
 }
 
+// ===================== Factory helpers =====================
+
+namespace {
+	template <class T, class... Args>
+	SemaTypePtr makeType(Args&&... args) {
+		return std::make_shared<T>(std::forward<Args>(args)...);
+	}
+}
+
+SemaTypePtr makeIntType() {
+	static SemaTypePtr instance = makeType<IntType>();
+	return instance;
+}
+
+SemaTypePtr makeByteType() {
+	static SemaTypePtr instance = makeType<ByteType>();
+	return instance;
+}
+
+SemaTypePtr makeVoidType() {
+	static SemaTypePtr instance = makeType<VoidType>();
+	return instance;
+}
+
+SemaTypePtr makeArrayType(SemaTypePtr element, std::optional<std::size_t> size) {
+	return makeType<ArrayType>(std::move(element), size);
+}
+
+SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<FuncType::Param> params) {
+	return makeType<FuncType>(std::move(returnType), std::move(params));
+}

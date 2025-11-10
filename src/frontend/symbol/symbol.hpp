@@ -1,38 +1,50 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
-#include "../ast/ast.hpp"
+#include "../common/source_location.hpp"
 #include "sematype.hpp"
 
 class Symbol {
 public:
 	enum class SymKind {
-    	VAR,
-    	PARAM,
-    	FUNC,
-    	PROC,
-		LABEL
+		Var,
+		Param,
+		Func,
+		Proc,
+		Label
 	};
 
-    Symbol(const std::string& name, SymKind kind, SemaType* type, SourceLoc loc);
-	~Symbol();
+	Symbol(std::string name, SymKind kind, SemaTypePtr type, SourceLoc loc);
+	~Symbol() = default;
 
-    const std::string& getName() const;
-    SymKind getSymKind() const;
-    const SemaType* getType() const;
-    SourceLoc location() const;
+	const std::string& name() const;
+	SymKind kind() const;
+	const SemaTypePtr& type() const;
+	const SourceLoc& location() const;
 
-	bool isVar() const;
-	bool isFunc() const;
-	bool isParam() const;
-	bool isDecl() const;
-	bool isProc() const;
+	bool isVariable() const;
+	bool isParameter() const;
+	bool isFunction() const;
+	bool isProcedure() const;
 	bool isLabel() const;
 
+	void markForwardDeclaration();
+	void markDefined();
+	bool isForwardDeclaration() const;
+	bool isDefined() const;
+	bool needsDefinition() const;
+
+	void setParamPassing(SemaType::ParamPass pass);
+	std::optional<SemaType::ParamPass> paramPassing() const;
+
 private:
-    std::string name_;
-    SymKind kind_;
-    SemaType* type_;
-    SourceLoc loc_;
+	std::string name_;
+	SymKind kind_;
+	SemaTypePtr type_;
+	SourceLoc loc_;
+	bool isForward_ = false;
+	bool isDefined_ = false;
+	std::optional<SemaType::ParamPass> paramPass_;
 };

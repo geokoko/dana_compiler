@@ -8,14 +8,21 @@
 
 class Scope {
 public:
-    explicit Scope(Scope* parent = nullptr);
+	struct InsertResult {
+		Symbol* symbol = nullptr;
+		bool inserted = false;
+	};
 
-	void declare(Symbol& s);
-    Symbol* lookupLocal(const std::string& id) const;
-    Symbol* lookup(const std::string& id) const;
-    Scope* parent() const noexcept;
+	explicit Scope(Scope* parent = nullptr);
+
+	InsertResult declare(std::unique_ptr<Symbol> symbol);
+	Symbol* lookupLocal(const std::string& id) const;
+	Symbol* lookup(const std::string& id) const;
+	Scope* parent() const noexcept;
+
+	const std::unordered_map<std::string, std::unique_ptr<Symbol>>& symbols() const;
 
 private:
-    std::unordered_map<std::string, std::unique_ptr<Symbol>> table_;
-    Scope* parent_;
+	std::unordered_map<std::string, std::unique_ptr<Symbol>> table_;
+	Scope* parent_ = nullptr;
 };

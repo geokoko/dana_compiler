@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -8,18 +9,19 @@
 
 class SymbolTable {
 public:
-    SymbolTable();
-	~SymbolTable();
+	SymbolTable();
 
-    void openScope();
-    void closeScope();
+	void openScope();
+	void closeScope();
 
-    Scope& current();
-    const Scope& current() const;
+	Scope& current();
+	const Scope& current() const;
 
-    Symbol* lookup(const std::string& id) const;
-	void insert(Symbol& s);
+	Symbol* lookup(const std::string& id) const;
+	Scope::InsertResult declare(std::unique_ptr<Symbol> symbol);
+
+	std::size_t depth() const;
 
 private:
-    std::vector<std::unique_ptr<Scope>> scopes_; //stack
+	std::vector<std::unique_ptr<Scope>> scopes_;
 };
