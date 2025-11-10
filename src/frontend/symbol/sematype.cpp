@@ -70,12 +70,8 @@ const SemaTypePtr& FuncType::returnType() const {
 	return ret_;
 }
 
-const std::vector<FuncType::Param>& FuncType::params() const {
+const std::vector<FuncType::ParamType>& FuncType::params() const {
 	return params_;
-}
-
-const std::vector<SemaType::ParamPass>& FuncType::paramPasses() const {
-	return passes_;
 }
 
 bool FuncType::equals(const SemaType& other) const {
@@ -122,34 +118,3 @@ bool VoidType::equals(const SemaType& other) const {
 	return other.getKind() == TypeKind::VOID;
 }
 
-// ===================== Factory helpers =====================
-
-namespace {
-	template <class T, class... Args>
-	SemaTypePtr makeType(Args&&... args) {
-		return std::make_shared<T>(std::forward<Args>(args)...);
-	}
-}
-
-SemaTypePtr makeIntType() {
-	static SemaTypePtr instance = makeType<IntType>();
-	return instance;
-}
-
-SemaTypePtr makeByteType() {
-	static SemaTypePtr instance = makeType<ByteType>();
-	return instance;
-}
-
-SemaTypePtr makeVoidType() {
-	static SemaTypePtr instance = makeType<VoidType>();
-	return instance;
-}
-
-SemaTypePtr makeArrayType(SemaTypePtr element, std::optional<std::size_t> size) {
-	return makeType<ArrayType>(std::move(element), size);
-}
-
-SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<FuncType::Param> params) {
-	return makeType<FuncType>(std::move(returnType), std::move(params));
-}

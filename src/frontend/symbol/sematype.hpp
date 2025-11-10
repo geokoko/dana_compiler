@@ -70,20 +70,18 @@ private:
 
 class FuncType : public SemaType {
 public:
-    using Param = std::pair<SemaTypePtr, ParamPass>;
+    using ParamType = std::pair<SemaTypePtr, ParamPass>;
 
-    FuncType(SemaTypePtr returnType, std::vector<Param> params);
+    FuncType(SemaTypePtr returnType, std::vector<ParamType> params);
 
     const SemaTypePtr& returnType() const;
-    const std::vector<Param>& params() const;
-    const std::vector<ParamPass>& paramPasses() const;
+    const std::vector<ParamType>& params() const;
 
     bool equals(const SemaType& other) const override;
 
 private:
     SemaTypePtr ret_;
-	std::vector<Param> params_;
-    std::vector<ParamPass> passes_;
+	std::vector<ParamType> params_;
 };
 
 // ---------- Void type (for procs / "no value") ----------
@@ -95,9 +93,3 @@ public:
     bool equals(const SemaType& other) const override;
 };
 
-// Factory helpers
-SemaTypePtr makeIntType();
-SemaTypePtr makeByteType();
-SemaTypePtr makeVoidType();
-SemaTypePtr makeArrayType(SemaTypePtr element, std::optional<std::size_t> size);
-SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<FuncType::Param> params);
