@@ -138,26 +138,26 @@ RelCond::RelCond(SourceLoc l, RelOp operation, up<Expr> left, up<Expr> right)
     : Cond(l), op(operation), lhs(std::move(left)), rhs(std::move(right)) {}
 
 // ---- Default no-op semantic passes ----
-void ASTNode::sem() {}
-void Stmt::sem() {}
-void Lval::sem() {}
-void Type::sem() {}
-void Block::sem() {}
-void Def::sem() {}
-void FParType::sem() {}
-void FParDef::sem() {}
-void Header::sem() {}
-void VarDef::sem() {}
-void FuncDecl::sem() {}
-void FuncDef::sem() {}
-void LValueExpr::sem() {}
-void ParenExpr::sem() {}
-void FuncCall::sem() {}
-void UnaryExpr::sem() {}
-void BinaryExpr::sem() {}
-void IntConst::sem() {}
-void CharConst::sem() {}
-void TrueConst::sem() {}
-void FalseConst::sem() {}
-void Cond::sem() {}
-void Rval::sem() {}
+void ASTNode::sem(SemContext& ctx) {}
+void Stmt::sem(SemContext& ctx) {}
+void Lval::sem(SemContext& ctx) {}
+void Type::sem(SemContext& ctx) {}
+void Block::sem(SemContext& ctx) {}
+void Def::sem(SemContext& ctx) {}
+void FParType::sem(SemContext& ctx) {}
+void FParDef::sem(SemContext& ctx) {}
+void Header::sem(SemContext& ctx) {}
+void VarDef::sem(SemContext& ctx) {}
+void FuncDecl::sem(SemContext& ctx) {}
+void FuncDef::sem(SemContext& ctx) {}
+void LValueExpr::sem(SemContext& ctx) {}
+void ParenExpr::sem(SemContext& ctx) {}
+void FuncCall::sem(SemContext& ctx) {}
+void UnaryExpr::sem(SemContext& ctx) {}
+void BinaryExpr::sem(SemContext& ctx) {}
+void IntConst::sem(SemContext& ctx) {}
+void CharConst::sem(SemContext& ctx) {}
+void TrueConst::sem(SemContext& ctx) {}
+void FalseConst::sem(SemContext& ctx) {}
+void Cond::sem(SemContext& ctx) {}
+void Rval::sem(SemContext& ctx) {}
