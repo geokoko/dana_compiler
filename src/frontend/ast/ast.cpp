@@ -35,11 +35,31 @@ FParType::FParType(SourceLoc l, bool ref, DataType type)
 FParType::FParType(SourceLoc l, bool ref, DataType type, vec<std::optional<int>> d)
     : Type(l, type, std::move(d)), by_ref(ref) {}
 
+bool FParType::isByRef() const {
+	return by_ref;
+}
+
 FParDef::FParDef(SourceLoc l, vec<string> names, up<FParType> t)
     : Def(l), identifiers(std::move(names)), type(std::move(t)) {}
 
+const vec<string>& FParDef::names() const {
+	return identifiers;
+}
+
+const FParType* FParDef::parameterType() const {
+	return type.get();
+}
+
 Header::Header(SourceLoc l, string n, optional<DataType> r, vec<up<FParDef>> p)
     : Def(l), name(std::move(n)), return_type(std::move(r)), params(std::move(p)) {}
+
+const string& Header::identifier() const {
+	return name;
+}
+
+const vec<up<FParDef>>& Header::parameters() const {
+	return params;
+}
 
 VarDef::VarDef(SourceLoc l, vec<string> ids, up<Type> t)
     : Def(l), names(std::move(ids)), declared_type(std::move(t)) {}

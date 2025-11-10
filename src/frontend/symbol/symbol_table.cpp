@@ -1,5 +1,4 @@
 #include "symbol_table.hpp"
-
 #include <cassert>
 
 SymbolTable::SymbolTable() {

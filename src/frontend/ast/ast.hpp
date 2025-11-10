@@ -106,6 +106,7 @@ public:
     FParType(SourceLoc l, bool ref, DataType type);
     FParType(SourceLoc l, bool ref, DataType type, vec<std::optional<int>> d);
 
+	bool isByRef() const;
     void sem(SemContext& ctx) override;
     void print(std::ostream& out) const override;
 };
@@ -136,6 +137,7 @@ protected:
 
 public:
     Program(SourceLoc l, up<Def> d);
+	void sem(SemContext& ctx) override;
     void print(std::ostream& out) const override;
 };
 
@@ -149,6 +151,8 @@ protected:
 public:
     FParDef(SourceLoc l, vec<string> names, up<FParType> t);
     void sem(SemContext& ctx) override;
+	const vec<string>& names() const;
+	const FParType* parameterType() const;
     void print(std::ostream& out) const override;
 };
 
@@ -162,6 +166,8 @@ public:
     Header(SourceLoc l, string n, optional<DataType> r, vec<up<FParDef>> p);
 
     void sem(SemContext& ctx) override;
+	const string& identifier() const;
+	const vec<up<FParDef>>& parameters() const;
     void print(std::ostream& out) const override;
 };
 

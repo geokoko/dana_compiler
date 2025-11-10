@@ -1,4 +1,6 @@
+#include <string>
 #include "../ast/ast.hpp"
+#include "../symbol/symbol.hpp"
 #include "sema_context.hpp"
 
 // Semantic analysis functions for AST nodes
@@ -23,7 +25,8 @@ void FParDef::sem(SemContext& context) {
 }
 
 void Header::sem(SemContext& context) {
-
+	context.setCurrentHeader(this);
+	std::
 }
 
 void VarDef::sem(SemContext& context) {
@@ -35,6 +38,16 @@ void FuncDecl::sem(SemContext& context) {
 }
 
 void FuncDef::sem(SemContext& context) {
+	// check header semantics
+	header->sem(context);
+	// check local definitions semantics
+	for (auto& def : locals) {
+		def->sem(context);
+	}
+	// check body semantics
+	body->sem(context);
+
+	
 
 }
 
