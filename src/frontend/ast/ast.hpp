@@ -13,6 +13,7 @@
 #include "../common/types.hpp"
 #include "operators.hpp"
 
+
 using std::string;
 using std::make_unique;
 using std::optional;
@@ -151,8 +152,6 @@ protected:
 public:
     FParDef(SourceLoc l, vec<string> names, up<FParType> t);
     void sem(SemContext& ctx) override;
-	const vec<string>& names() const;
-	const FParType* parameterType() const;
     void print(std::ostream& out) const override;
 };
 

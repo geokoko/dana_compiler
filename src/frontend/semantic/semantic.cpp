@@ -7,34 +7,87 @@
 // Each sem() function performs semantic checks and type resolution
 
 void Program::sem(SemContext& context) {
-	top->sem(context);
+	if (top) top->sem(context);
 }
 
 void Block::sem(SemContext& context) {
-	for (auto& stmt : statements) {
-		stmt->sem(context);
-	}
+	for (auto& stmt : statements) stmt->sem(context);
 }
 
 void FParType::sem(SemContext& context) {
+	for (const auto& dim : dimensions()) {
+		if (dim.has_value() && dim.value() <= 0) {
+			context.diags().error(loc, "array dimension must be a positive integer");
+		}
+	}
+
+	if (!dims.empty() && !isByRef()) {
+		context.diags().error(loc, "array parameters must be passed by reference");
+	}
 
 }
 
 void FParDef::sem(SemContext& context) {
+	// check parameter type semantics
+	type->sem(context);
 
+	DataType baseType = type->data_type();
+	auto dims = type->dimensions();
+	bool byRef = type->isByRef();
+
+	// create symbol for each parameter name
+	for (const auto& name : identifiers) {
+		auto sym = std::make_unique<Symbol>(
+			name,
+			Symbol::SymKind::Param,
+			std::make_shared<ParameterType>(baseType, dims, byRef),
+			loc
+		);
+		context.declareSymbol(std::move(sym));
+	}
 }
 
 void Header::sem(SemContext& context) {
-	context.setCurrentHeader(this);
-	std::
+	/* checks needed:
+	- check for duplicate function/procedure name in current scope
+	- check parameter types semantics
+	- return type semantics
+	*/
+	// check parameter types semantics
+	for (const auto& param : parameters()) {
+		param->sem(context);
+	}
 }
 
 void VarDef::sem(SemContext& context) {
+	// type checking
+	declared_type->sem(context);
 
+	DataType baseType = declared_type->data_type();
+	const auto& dims = declared_type->dimensions();
+
+	// create symbol for each variable name
+	for (const auto& name : names) {
+		auto sym = std::make_unique<Symbol>(
+			name,
+			Symbol::SymKind::Var,
+			std::make_shared<VariableType>(baseType, dims),
+			loc
+		);
+		context.declareSymbol(std::move(sym));
+	}
 }
 
 void FuncDecl::sem(SemContext& context) {
+	// forward declaration, just check header semantics and insert symbol into current scope
+	header->sem(context);
 
+	auto sym = std::make_unique<Symbol>(
+		header->identifier(),
+		Symbol::SymKind::Func,
+		std::make_shared<FunctionType>(/* construct from header info */),
+		loc
+	);
 }
 
 void FuncDef::sem(SemContext& context) {

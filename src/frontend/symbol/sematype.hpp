@@ -16,11 +16,6 @@ public:
 		VOID
 	};
 
-	enum class ParamPass {
-		BY_VAL,
-		BY_REF
-	};
-
 	virtual ~SemaType() = default;
 	TypeKind getKind() const;
 	virtual bool equals(const SemaType &other) const = 0; // for type-checking
@@ -70,18 +65,16 @@ private:
 
 class FuncType : public SemaType {
 public:
-    using ParamType = std::pair<SemaTypePtr, ParamPass>;
-
-    FuncType(SemaTypePtr returnType, std::vector<ParamType> params);
+    FuncType(SemaTypePtr returnType, std::vector<SemaTypePtr> params);
 
     const SemaTypePtr& returnType() const;
-    const std::vector<ParamType>& params() const;
+    const std::vector<SemaTypePtr>& params() const;
 
     bool equals(const SemaType& other) const override;
 
 private:
     SemaTypePtr ret_;
-	std::vector<ParamType> params_;
+	std::vector<SemaTypePtr> params_;
 };
 
 // ---------- Void type (for procs / "no value") ----------

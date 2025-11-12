@@ -3,71 +3,57 @@
 #include <utility>
 
 Symbol::Symbol(std::string name, SymKind kind, SemaTypePtr type, SourceLoc loc)
-	: name_(std::move(name)),
-	  kind_(kind),
-	  type_(std::move(type)),
-	  loc_(loc) {}
+    : name_(std::move(name)),
+      kind_(kind),
+      type_(std::move(type)),
+      loc_(loc) {}
 
-const std::string& Symbol::name() const {
-	return name_;
+const std::string& Symbol::getName() const {
+    return name_;
 }
 
-Symbol::SymKind Symbol::kind() const {
-	return kind_;
+Symbol::SymKind Symbol::getKind() const {
+    return kind_;
 }
 
-const SemaTypePtr& Symbol::type() const {
-	return type_;
+const SemaTypePtr& Symbol::getType() const {
+    return type_;
 }
 
-const SourceLoc& Symbol::location() const {
-	return loc_;
+SourceLoc Symbol::getLocation() const {
+    return loc_;
 }
 
-bool Symbol::isVariable() const {
-	return kind_ == SymKind::Var;
+Symbol::ParamPass ParamSymbol::getPass() const {
+    return pass_;
 }
 
-bool Symbol::isParameter() const {
-	return kind_ == SymKind::Param;
+void FuncSymbol::addParam(std::shared_ptr<ParamSymbol> param) {
+    if (param) {
+        params_.push_back(std::move(param));
+    }
 }
 
-bool Symbol::isFunction() const {
-	return kind_ == SymKind::Func || kind_ == SymKind::Proc;
+const std::vector<std::shared_ptr<ParamSymbol>>& FuncSymbol::getParams() const {
+    return params_;
 }
 
-bool Symbol::isProcedure() const {
-	return kind_ == SymKind::Proc;
+const SemaTypePtr& FuncSymbol::getReturnType() const {
+    return returnType_;
 }
 
-bool Symbol::isLabel() const {
-	return kind_ == SymKind::Label;
+SemaTypePtr FuncSymbol::setReturnType(SemaTypePtr returnType) {
+    SemaTypePtr previous = std::move(returnType_);
+    returnType_ = std::move(returnType);
+    return previous;
 }
 
-void Symbol::markForwardDeclaration() {
-	isForward_ = true;
+void ProcSymbol::addParam(std::shared_ptr<ParamSymbol> param) {
+    if (param) {
+        params_.push_back(std::move(param));
+    }
 }
 
-void Symbol::markDefined() {
-	isDefined_ = true;
-}
-
-bool Symbol::isForwardDeclaration() const {
-	return isForward_;
-}
-
-bool Symbol::isDefined() const {
-	return isDefined_;
-}
-
-bool Symbol::needsDefinition() const {
-	return isForward_ && !isDefined_;
-}
-
-void Symbol::setParamPassing(SemaType::ParamPass pass) {
-	paramPass_ = pass;
-}
-
-std::optional<SemaType::ParamPass> Symbol::paramPassing() const {
-	return paramPass_;
+const std::vector<std::shared_ptr<ParamSymbol>>& ProcSymbol::getParams() const {
+    return params_;
 }
