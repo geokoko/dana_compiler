@@ -24,16 +24,16 @@ std::size_t SemContext::scopeDepth() const {
     return symtab_.depth();
 }
 
-Scope::LookupResult SemContext::lookupSymbol(const std::string& name) const {
+LookupResult SemContext::lookupSymbol(const std::string& name) const {
     return symtab_.lookup(name);
 }
 
-Scope::LookupResult SemContext::lookupLocalSymbol(const std::string& name) const {
+LookupResult SemContext::lookupLocalSymbol(const std::string& name) const {
     return symtab_.current().lookupLocal(name);
 }
 
-Scope::InsertResult SemContext::declareSymbol(std::unique_ptr<Symbol> symbol,
-                                              bool reportDuplicates) {
+InsertResult SemContext::declareSymbol(std::unique_ptr<Symbol> symbol,
+                                       bool reportDuplicates) {
     if (!symbol) {
         return {nullptr, false};
     }

@@ -6,7 +6,7 @@ Scope::Scope(Scope* parent)
 	: parent_(parent) {}
 
 // Declare symbol in current scope (aka insert into symbol table)
-Scope::InsertResult Scope::declare(std::unique_ptr<Symbol> symbol) {
+InsertResult Scope::declare(std::unique_ptr<Symbol> symbol) {
 	if (!symbol) {
 		return {};
 	}
@@ -17,7 +17,7 @@ Scope::InsertResult Scope::declare(std::unique_ptr<Symbol> symbol) {
 }
 
 // Lookup symbol in current scope only
-Scope::LookupResult Scope::lookupLocal(const std::string& id) const {
+LookupResult Scope::lookupLocal(const std::string& id) const {
 	auto it = table_.find(id);
 	if (it == table_.end()) {
 		return {};
@@ -26,7 +26,7 @@ Scope::LookupResult Scope::lookupLocal(const std::string& id) const {
 }
 
 // Lookup symbol in current scope and parent scopes
-Scope::LookupResult Scope::lookup(const std::string& id) const {
+LookupResult Scope::lookup(const std::string& id) const {
 	for (const Scope* scope = this; scope != nullptr; scope = scope->parent_) {
 		// Look in current scope
 		auto result = scope->lookupLocal(id);

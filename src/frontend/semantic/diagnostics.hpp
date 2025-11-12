@@ -4,6 +4,19 @@
 
 #include "../common/source_location.hpp"
 
+class Symbol;
+class Scope;
+
+struct InsertResult {
+	Symbol* symbol = nullptr;
+	bool inserted = false;
+};
+
+struct LookupResult {
+	Symbol* symbol = nullptr;
+	const Scope* owner = nullptr;
+};
+
 class Diagnostics {
 public:
 	enum class Severity {

@@ -4,20 +4,11 @@
 #include <string>
 #include <unordered_map>
 
+#include "../semantic/diagnostics.hpp"
 #include "symbol.hpp"
 
 class Scope {
 public:
-	struct InsertResult {
-		Symbol* symbol = nullptr;
-		bool inserted = false;
-	};
-
-	struct LookupResult {
-		Symbol* symbol = nullptr;
-		const Scope* owner = nullptr;
-	};
-
 	explicit Scope(Scope* parent = nullptr);
 
 	InsertResult declare(std::unique_ptr<Symbol> symbol);

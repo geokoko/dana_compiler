@@ -13,17 +13,21 @@ class SemContext {
 public:
     SemContext(SymbolTable& st, Diagnostics& d);
 
+	// accessors to symbol table and diagnostics
     SymbolTable& symtab();
     Diagnostics& diags();
 
+	// api functions for managing scopes
     void openScope();
     void closeScope();
     std::size_t scopeDepth() const;
 
-    Scope::LookupResult lookupSymbol(const std::string& name) const;
-    Scope::LookupResult lookupLocalSymbol(const std::string& name) const;
+	// api function for looking up symbols
+    LookupResult lookupSymbol(const std::string& name) const;
+    LookupResult lookupLocalSymbol(const std::string& name) const;
 
-    Scope::InsertResult declareSymbol(std::unique_ptr<Symbol> symbol, bool reportDuplicates = true);
+    // api function for adding symbols to the current scope
+	InsertResult declareSymbol(std::unique_ptr<Symbol> symbol, bool reportDuplicates = true);
 
 private:
     SymbolTable& symtab_;
