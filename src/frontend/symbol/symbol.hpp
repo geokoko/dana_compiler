@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <string>
 
 #include "../common/source_location.hpp"

@@ -17,7 +17,7 @@ public:
 	Scope& current();
 	const Scope& current() const;
 
-	Symbol* lookup(const std::string& id) const;
+	Scope::LookupResult lookup(const std::string& id) const;
 	Scope::InsertResult declare(std::unique_ptr<Symbol> symbol);
 
 	std::size_t depth() const;

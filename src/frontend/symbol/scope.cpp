@@ -11,26 +11,30 @@ Scope::InsertResult Scope::declare(std::unique_ptr<Symbol> symbol) {
 		return {};
 	}
 
-	const std::string& id = symbol->name();
+	const std::string& id = symbol->getName();
 	auto [it, inserted] = table_.emplace(id, std::move(symbol));
 	return InsertResult{it->second.get(), inserted};
 }
 
 // Lookup symbol in current scope only
-Symbol* Scope::lookupLocal(const std::string& id) const {
+Scope::LookupResult Scope::lookupLocal(const std::string& id) const {
 	auto it = table_.find(id);
-	return it == table_.end() ? nullptr : it->second.get();
+	if (it == table_.end()) {
+		return {};
+	}
+	return LookupResult{it->second.get(), this};
 }
 
 // Lookup symbol in current scope and parent scopes
-Symbol* Scope::lookup(const std::string& id) const {
+Scope::LookupResult Scope::lookup(const std::string& id) const {
 	for (const Scope* scope = this; scope != nullptr; scope = scope->parent_) {
 		// Look in current scope
-		if (auto* found = scope->lookupLocal(id)) {
-			return found;
+		auto result = scope->lookupLocal(id);
+		if (result.symbol) {
+			return result;
 		}
 	}
-	return nullptr;
+	return {};
 }
 
 // Get parent scope

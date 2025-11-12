@@ -4,6 +4,7 @@
 #include <string>
 
 #include "../common/source_location.hpp"
+#include "../symbol/scope.hpp"
 #include "../symbol/symbol.hpp"
 #include "../symbol/symbol_table.hpp"
 #include "diagnostics.hpp"
@@ -19,11 +20,10 @@ public:
     void closeScope();
     std::size_t scopeDepth() const;
 
-    Symbol* lookupSymbol(const std::string& name) const;
-    Symbol* lookupLocalSymbol(const std::string& name) const;
+    Scope::LookupResult lookupSymbol(const std::string& name) const;
+    Scope::LookupResult lookupLocalSymbol(const std::string& name) const;
 
-    Symbol* declareSymbol(std::unique_ptr<Symbol> symbol, bool reportDuplicates = true);
-
+    Scope::InsertResult declareSymbol(std::unique_ptr<Symbol> symbol, bool reportDuplicates = true);
 
 private:
     SymbolTable& symtab_;

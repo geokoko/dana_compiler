@@ -183,8 +183,9 @@ void ParenExpr::sem(SemContext& context) {
 }
 
 void FuncCall::sem(SemContext& context) {
-	Symbol* sym = context.symtab().lookup(name);
-    if (!sym || !sym->isFunction()) {
+	auto lookup = context.lookupSymbol(name);
+    Symbol* sym = lookup.symbol;
+    if (!sym || sym->getKind() != Symbol::SymKind::FUNC) {
         context.diags().error(loc,
             "call to unknown function '" + name + "'");
         exprType = Type::Error();
