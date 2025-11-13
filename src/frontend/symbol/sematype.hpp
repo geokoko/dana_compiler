@@ -86,3 +86,8 @@ public:
     bool equals(const SemaType& other) const override;
 };
 
+SemaTypePtr makeIntType();
+SemaTypePtr makeByteType();
+SemaTypePtr makeVoidType();
+SemaTypePtr makeArrayType(SemaTypePtr elementType, std::optional<std::size_t> size);
+SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<SemaTypePtr> params);

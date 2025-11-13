@@ -104,3 +104,33 @@ bool FuncType::equals(const SemaType& other) const {
 bool VoidType::equals(const SemaType& other) const {
     return other.getKind() == TypeKind::VOID;
 }
+
+namespace {
+	template <class T, class... Args>
+	SemaTypePtr makeType(Args&&... args) {
+		return std::make_shared<T>(std::forward<Args>(args)...);
+	}
+}
+
+SemaTypePtr makeIntType() {
+	static SemaTypePtr instance = makeType<IntType>();
+	return instance;
+}
+
+SemaTypePtr makeByteType() {
+	static SemaTypePtr instance = makeType<ByteType>();
+	return instance;
+}
+
+SemaTypePtr makeVoidType() {
+	static SemaTypePtr instance = makeType<VoidType>();
+	return instance;
+}
+
+SemaTypePtr makeArrayType(SemaTypePtr elementType, std::optional<std::size_t> size) {
+	return makeType<ArrayType>(std::move(elementType), size);
+}
+
+SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<SemaTypePtr> params) {
+	return makeType<FuncType>(std::move(returnType), std::move(params));
+}
