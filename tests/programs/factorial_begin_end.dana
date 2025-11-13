@@ -1,0 +1,6 @@
+def fact is int: n as int
+begin
+	if n <= 1: begin return: 0 		end
+	else:
+ 		begin return: n * fact(n-1) end
+end

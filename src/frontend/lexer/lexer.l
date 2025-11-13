@@ -54,8 +54,7 @@ ID_CHAR [a-zA-Z0-9_]
 %%
 
 <PENDING>(.|\n) 		{
-  	printf("I AM IN PENDING STATE\n");
-	yyless(0); 							/* put char back; DO NOT CONSUME */
+	yyless(0); /* put char back; DO NOT CONSUME */
 	if (--pendingAutoEnds == 0) {
 		BEGIN(INITIAL); 				/* leave PENDING state */
 		return yylex(yylval, yylloc); 	/* rescan from the same position in INITIAL, */
@@ -132,13 +131,11 @@ ID_CHAR [a-zA-Z0-9_]
 
 "and"					{ 
 	/* Keyword */
-	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_AND; 
 }
-"is"					{
-	EMIT_AUTOEND_IF_NEEDED();
+"is"					{ 
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_IS; 
@@ -149,8 +146,7 @@ ID_CHAR [a-zA-Z0-9_]
 	columno += yyleng;
 	return parser::token::T_SKIP; 
 }
-"as"					{
-	EMIT_AUTOEND_IF_NEEDED();
+"as"					{ 
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_AS; 
@@ -161,14 +157,18 @@ ID_CHAR [a-zA-Z0-9_]
 	columno += yyleng;
 	return parser::token::T_INT; 
 }
-"true"					{
-	EMIT_AUTOEND_IF_NEEDED();
+"true"					{ 
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_TRUE; 
 }
-"begin"					{
-	EMIT_AUTOEND_IF_NEEDED();
+"begin"					{ 
+	// do not apply offside rule after begin
+	// instead, pop the last guide token if any
+	if (cur_indent_level > 1) {
+		popGuide();
+	}
+
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_BEGIN; 
@@ -185,14 +185,13 @@ ID_CHAR [a-zA-Z0-9_]
 	columno += yyleng;
 	return parser::token::T_BREAK; 
 }
-"end"					{
-	EMIT_AUTOEND_IF_NEEDED();
+"end"					{ 
+	/* Explicit end of an explicit block: no off-side handling. */
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_END; 
 }
-"not"					{
-	EMIT_AUTOEND_IF_NEEDED();
+"not"					{ 
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_NOT; 
@@ -209,8 +208,7 @@ ID_CHAR [a-zA-Z0-9_]
 	columno += yyleng;
 	return parser::token::T_EXIT; 
 }
-"or"					{
-	EMIT_AUTOEND_IF_NEEDED();
+"or"					{ 
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_OR; 
@@ -221,14 +219,14 @@ ID_CHAR [a-zA-Z0-9_]
 	columno += yyleng;
 	return parser::token::T_CONT; 
 }
-"false"					{
-	EMIT_AUTOEND_IF_NEEDED();
+
+"false"					{ 
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_FALSE; 
 }
 "ref"					{ 
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_REF; 
@@ -265,7 +263,7 @@ ID_CHAR [a-zA-Z0-9_]
 
 {DIGIT}+				{ 
 	/* Integer constant */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	yylval->emplace<int>(std::stoi(yytext));
@@ -274,7 +272,7 @@ ID_CHAR [a-zA-Z0-9_]
 
 '([^\'\\]|\\[nrt0'"\\]|\\x[0-9A-Fa-f]{2})'		{
 	/* Character constant with escape handling */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	char c;
@@ -311,28 +309,28 @@ ID_CHAR [a-zA-Z0-9_]
 
 ":="                    { 
 	/* Assignment operator */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_ASSIGN; 
 }
 "<>"                    { 
 	/* Not equal operator */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_NE; 
 }
 "<="                    { 
 	/* Less than or equal operator */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_LE; 
 }
 ">="                    { 
 	/* Greater than or equal operator */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return parser::token::T_GE; 
@@ -341,7 +339,7 @@ ID_CHAR [a-zA-Z0-9_]
 
 [\=\<\>\+\-\*\/\%\(\)\[\]\,\:]    { 
 	/* Single-character operators */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return yytext[0]; 
@@ -350,21 +348,21 @@ ID_CHAR [a-zA-Z0-9_]
 
 "!"						{ 
 	/* Bitwise NOT operator */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return '!'; 
 }
 "|"						{ 
 	/* Bitwise OR operator */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return '|'; 
 }
 "&" 					{ 
 	/* Bitwise AND operator */
-	EMIT_AUTOEND_IF_NEEDED();
+
 	atLineStart = false;
 	columno += yyleng;
 	return '&'; 
