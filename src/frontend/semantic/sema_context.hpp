@@ -22,6 +22,8 @@ public:
     Diagnostics& diags();
 	const SymbolTable& symtab() const;
 	const Diagnostics& diags() const;
+	bool hasErrors() const;
+	void printDiagnostics() const;
 
 	// api functions for managing scopes
     void openScope();

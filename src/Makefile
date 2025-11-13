@@ -24,7 +24,21 @@ PARSER_CPP = $(PARSER_DIR)/parser.tab.cc
 PARSER_HH = $(PARSER_DIR)/parser.tab.hh
 PARSER_LOC = $(PARSER_DIR)/location.hh
 
-SRCS := main.cpp $(AST_DIR)/ast.cpp $(AST_DIR)/ast_print.cpp $(PARSER_CPP) $(LEXER_CPP)
+SEMANTIC_DIR = $(FRONTEND_DIR)/semantic
+SYMBOL_DIR = $(FRONTEND_DIR)/symbol
+
+SRCS := main.cpp \
+        $(AST_DIR)/ast.cpp \
+        $(AST_DIR)/ast_print.cpp \
+        $(SEMANTIC_DIR)/semantic.cpp \
+        $(SEMANTIC_DIR)/sema_context.cpp \
+        $(SEMANTIC_DIR)/diagnostics.cpp \
+        $(SYMBOL_DIR)/symbol.cpp \
+        $(SYMBOL_DIR)/symbol_table.cpp \
+        $(SYMBOL_DIR)/scope.cpp \
+        $(SYMBOL_DIR)/sematype.cpp \
+        $(PARSER_CPP) \
+        $(LEXER_CPP)
 OBJS := $(SRCS:.cpp=.o)
 
 # Default target

@@ -20,6 +20,14 @@ const Diagnostics& SemContext::diags() const {
     return diags_;
 }
 
+bool SemContext::hasErrors() const {
+	return diags_.hasErrors();
+}
+
+void SemContext::printDiagnostics() const {
+	diags_.printAll();
+}
+
 void SemContext::openScope() {
     symtab_.openScope();
 }
@@ -114,5 +122,3 @@ std::optional<SemContext::HeaderInfo> SemContext::takeHeaderInfo() {
 	pendingHeader_.reset();
 	return result;
 }
-
-
