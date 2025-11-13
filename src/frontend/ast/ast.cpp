@@ -204,28 +204,3 @@ BinaryCond::BinaryCond(SourceLoc l, LogicOp operation, up<Cond> left, up<Cond> r
 
 RelCond::RelCond(SourceLoc l, RelOp operation, up<Expr> left, up<Expr> right)
     : Cond(l), op(operation), lhs(std::move(left)), rhs(std::move(right)) {}
-
-// ---- Default no-op semantic passes ----
-void ASTNode::sem(SemContext& ctx) {}
-void Stmt::sem(SemContext& ctx) {}
-void Lval::sem(SemContext& ctx) {}
-void Type::sem(SemContext& ctx) {}
-void Block::sem(SemContext& ctx) {}
-void Def::sem(SemContext& ctx) {}
-void FParType::sem(SemContext& ctx) {}
-void FParDef::sem(SemContext& ctx) {}
-void Header::sem(SemContext& ctx) {}
-void VarDef::sem(SemContext& ctx) {}
-void FuncDecl::sem(SemContext& ctx) {}
-void FuncDef::sem(SemContext& ctx) {}
-void LValueExpr::sem(SemContext& ctx) {}
-void ParenExpr::sem(SemContext& ctx) {}
-void FuncCall::sem(SemContext& ctx) {}
-void UnaryExpr::sem(SemContext& ctx) {}
-void BinaryExpr::sem(SemContext& ctx) {}
-void IntConst::sem(SemContext& ctx) {}
-void CharConst::sem(SemContext& ctx) {}
-void TrueConst::sem(SemContext& ctx) {}
-void FalseConst::sem(SemContext& ctx) {}
-void Cond::sem(SemContext& ctx) {}
-void Rval::sem(SemContext& ctx) {}
