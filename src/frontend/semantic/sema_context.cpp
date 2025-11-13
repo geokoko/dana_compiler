@@ -8,7 +8,15 @@ SymbolTable& SemContext::symtab() {
     return symtab_;
 }
 
+const SymbolTable& SemContext::symtab() const {
+    return symtab_;
+}
+
 Diagnostics& SemContext::diags() {
+    return diags_;
+}
+
+const Diagnostics& SemContext::diags() const {
     return diags_;
 }
 
@@ -48,3 +56,63 @@ InsertResult SemContext::declareSymbol(std::unique_ptr<Symbol> symbol,
 
     return result;
 }
+
+void SemContext::enterFunction(FunctionFrame frame) {
+	functionStack_.push_back(std::move(frame));
+}
+
+void SemContext::leaveFunction() {
+	if (!functionStack_.empty()) {
+		functionStack_.pop_back();
+	}
+}
+
+bool SemContext::insideFunction() const {
+	return !functionStack_.empty();
+}
+
+SemContext::FunctionFrame* SemContext::currentFunction() {
+	return functionStack_.empty() ? nullptr : &functionStack_.back();
+}
+
+const SemContext::FunctionFrame* SemContext::currentFunction() const {
+	return functionStack_.empty() ? nullptr : &functionStack_.back();
+}
+
+void SemContext::pushLoop(std::optional<std::string> label) {
+	loopStack_.push_back(LoopFrame{std::move(label)});
+}
+
+void SemContext::popLoop() {
+	if (!loopStack_.empty()) {
+		loopStack_.pop_back();
+	}
+}
+
+bool SemContext::inLoop() const {
+	return !loopStack_.empty();
+}
+
+bool SemContext::hasLoopLabel(const std::string& label) const {
+	for (auto it = loopStack_.rbegin(); it != loopStack_.rend(); ++it) {
+		if (it->label && *it->label == label) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void SemContext::setHeaderInfo(HeaderInfo info) {
+	pendingHeader_ = std::move(info);
+}
+
+std::optional<SemContext::HeaderInfo> SemContext::takeHeaderInfo() {
+	if (!pendingHeader_) {
+		return std::nullopt;
+	}
+	auto result = std::move(*pendingHeader_);
+	pendingHeader_.reset();
+	return result;
+}
+
+
