@@ -2,11 +2,16 @@
 
 ASTNode::ASTNode(SourceLoc loc) : loc(loc) {}
 
+ASTNode::~ASTNode() = default;
+
 Expr::Expr(SourceLoc loc) : ASTNode(loc) {}
+Expr::~Expr() = default;
 
 Stmt::Stmt(SourceLoc l) : ASTNode(l) {}
+Stmt::~Stmt() = default;
 
 Lval::Lval(SourceLoc l) : ASTNode(l) {}
+Lval::~Lval() = default;
 
 SemaTypePtr Expr::type() const {
 	return resolvedType_;
@@ -204,3 +209,5 @@ BinaryCond::BinaryCond(SourceLoc l, LogicOp operation, up<Cond> left, up<Cond> r
 
 RelCond::RelCond(SourceLoc l, RelOp operation, up<Expr> left, up<Expr> right)
     : Cond(l), op(operation), lhs(std::move(left)), rhs(std::move(right)) {}
+
+void Type::sem(SemContext&) {}

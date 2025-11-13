@@ -30,8 +30,8 @@ class ASTNode {
 public:
     SourceLoc loc;
     explicit ASTNode(SourceLoc loc);
-    virtual ~ASTNode() = default;
-    virtual void sem(SemContext& ctx);
+    virtual ~ASTNode() = 0;
+    virtual void sem(SemContext& context) = 0;
     virtual void print(std::ostream &out) const = 0;
 };
 
@@ -56,8 +56,8 @@ protected:
     bool constExpr_ = false;
 public:
     explicit Expr(SourceLoc loc);
-    virtual ~Expr() = default;
-    virtual void sem(SemContext& ctx) override = 0;
+    virtual ~Expr();
+    virtual void sem(SemContext& context) override = 0;
     virtual void print(std::ostream &out) const override = 0;
 	SemaTypePtr type() const;
 	void setType(SemaTypePtr type);
@@ -73,8 +73,8 @@ public:
 class Stmt : public ASTNode {
 public:
     explicit Stmt(SourceLoc l);
-    virtual ~Stmt() override = default;
-    void sem(SemContext& ctx) override = 0;
+    virtual ~Stmt() override;
+    void sem(SemContext& context) override = 0;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -85,8 +85,8 @@ protected:
 	bool assignable_ = true;
 public:
     explicit Lval(SourceLoc l);
-    virtual ~Lval() override = default;
-    void sem(SemContext& ctx) override = 0;
+    virtual ~Lval() override;
+    void sem(SemContext& context) override = 0;
     virtual void print(std::ostream& out) const override = 0;
 	SemaTypePtr type() const;
 	void setType(SemaTypePtr type);
@@ -101,7 +101,7 @@ protected:
 public:
     explicit Rval(SourceLoc l);
     virtual ~Rval() override = default;
-    void sem(SemContext& ctx) override = 0;
+    void sem(SemContext& context) override = 0;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -118,7 +118,7 @@ public:
 	DataType data_type() const;
     const vec<std::optional<int>>& dimensions() const;
 
-    virtual void sem(SemContext& ctx) override = 0;
+    virtual void sem(SemContext& context) override;
     virtual void print(std::ostream& out) const override;
 };
 
@@ -131,7 +131,7 @@ public:
     FParType(SourceLoc l, bool ref, DataType type, vec<std::optional<int>> d);
 
 	bool isByRef() const;
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -142,7 +142,7 @@ protected:
 
 public:
     Block(SourceLoc l, vec<up<Stmt>> stmts);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -150,7 +150,7 @@ public:
 class Def : public ASTNode {
 public:
     explicit Def(SourceLoc l);
-    virtual void sem(SemContext& ctx) override = 0;
+    virtual void sem(SemContext& context) override = 0;
     void print(std::ostream& out) const override;
 };
 
@@ -161,7 +161,7 @@ protected:
 
 public:
     Program(SourceLoc l, up<Def> d);
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -174,7 +174,7 @@ protected:
 
 public:
     FParDef(SourceLoc l, vec<string> names, up<FParType> t);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
 	const vec<string>& names() const;
 	const FParType* parameterType() const;
     void print(std::ostream& out) const override;
@@ -189,7 +189,7 @@ protected:
 public:
     Header(SourceLoc l, string n, optional<DataType> r, vec<up<FParDef>> p);
 
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
 	const string& identifier() const;
 	const vec<up<FParDef>>& parameters() const;
     void print(std::ostream& out) const override;
@@ -203,7 +203,7 @@ private:
 public:
     VarDef(SourceLoc l, vec<string> ids, up<Type> t);
 
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -214,7 +214,7 @@ protected:
 public:
     explicit FuncDecl(SourceLoc l, up<Header> h);
 
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -227,7 +227,7 @@ protected:
 public:
     FuncDef(SourceLoc l, up<Header> h, vec<up<Def>> defs, up<Block> b);
 
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -236,12 +236,14 @@ public:
 class SkipStmt : public Stmt {
 public:
     explicit SkipStmt(SourceLoc l);
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
 class ExitStmt : public Stmt {
 public:
     explicit ExitStmt(SourceLoc l);
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -253,7 +255,7 @@ protected:
 public:
     AssignStmt(SourceLoc l, up<Lval> left, up<Expr> right);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 class ReturnStmt : public Stmt {
@@ -263,7 +265,7 @@ protected:
 public:
     ReturnStmt(SourceLoc l, up<Expr> expr);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 class ProcCall : public Stmt {
@@ -274,7 +276,7 @@ protected:
 public:
     ProcCall(SourceLoc l, string id, vec<up<Expr>> a);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 class BreakStmt : public Stmt {
@@ -284,7 +286,7 @@ protected:
 public:
     BreakStmt(SourceLoc l, optional<string> lbl);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 class ContinueStmt : public Stmt {
@@ -294,7 +296,7 @@ protected:
 public:
     ContinueStmt(SourceLoc l, optional<string> lbl);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 // need to forward declare Cond for IfStmt
@@ -313,7 +315,7 @@ public:
            vec<std::pair<up<Cond>, up<Block>>> elifs,
            std::optional<up<Block>> else_block);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 class LoopStmt : public Stmt {
@@ -323,7 +325,7 @@ public:
 
     LoopStmt(SourceLoc l, std::optional<string> lbl, up<Block> blk);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 // ===== L-values =====
@@ -335,7 +337,7 @@ private:
 public:
     IdLVal(SourceLoc l, string id);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 class StringLiteralLVal : public Lval {
@@ -345,7 +347,7 @@ private:
 public:
     StringLiteralLVal(SourceLoc l, string v);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 class IndexLVal : public Lval {
@@ -356,7 +358,7 @@ protected:
 public:
     IndexLVal(SourceLoc l, up<Lval> b, up<Expr> idx);
     void print(std::ostream& out) const override;
-	void sem(SemContext& ctx) override;
+	void sem(SemContext& context) override;
 };
 
 // ===== R-values =====
@@ -367,7 +369,7 @@ private:
 
 public:
     IntConst(SourceLoc l, int v);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -377,21 +379,21 @@ private:
 
 public:
     CharConst(SourceLoc l, unsigned char v);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
 class TrueConst : public Rval {
 public:
     explicit TrueConst(SourceLoc l);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
 class FalseConst : public Rval {
 public:
     explicit FalseConst(SourceLoc l);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -403,7 +405,7 @@ protected:
 
 public:
     LValueExpr(SourceLoc l, up<Lval> val);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -413,7 +415,7 @@ protected:
 
 public:
     ParenExpr(SourceLoc l, up<Expr> expr);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -424,7 +426,7 @@ protected:
 
 public:
     FuncCall(SourceLoc l, string id, vec<up<Expr>> a);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -435,7 +437,7 @@ protected:
 
 public:
     UnaryExpr(SourceLoc l, UnOp operation, up<Expr> expr);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -447,7 +449,7 @@ protected:
 
 public:
     BinaryExpr(SourceLoc l, BinOp operation, up<Expr> left, up<Expr> right);
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -457,7 +459,7 @@ class Cond : public Expr {
 public:
     explicit Cond(SourceLoc l);
     ~Cond() override = default;
-    void sem(SemContext& ctx) override;
+    void sem(SemContext& context) override;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -467,6 +469,7 @@ protected:
 
 public:
     ExprCond(SourceLoc l, up<Expr> e);
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -476,6 +479,7 @@ protected:
 
 public:
     ParenCond(SourceLoc l, up<Cond> c);
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -485,6 +489,7 @@ protected:
 
 public:
     NotCond(SourceLoc l, up<Cond> c);
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -496,6 +501,7 @@ protected:
 
 public:
     BinaryCond(SourceLoc l, LogicOp operation, up<Cond> left, up<Cond> right);
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
 
@@ -507,5 +513,6 @@ protected:
 
 public:
     RelCond(SourceLoc l, RelOp operation, up<Expr> left, up<Expr> right);
+    void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
 };
