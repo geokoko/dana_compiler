@@ -8,6 +8,54 @@ Stmt::Stmt(SourceLoc l) : ASTNode(l) {}
 
 Lval::Lval(SourceLoc l) : ASTNode(l) {}
 
+SemaTypePtr Expr::type() const {
+	return resolvedType_;
+}
+
+void Expr::setType(SemaTypePtr type) {
+	resolvedType_ = std::move(type);
+}
+
+bool Expr::isLValue() const {
+	return isLValue_;
+}
+
+void Expr::setLValue(bool v) {
+	isLValue_ = v;
+}
+
+bool Expr::isAssignable() const {
+	return assignable_;
+}
+
+void Expr::setAssignable(bool v) {
+	assignable_ = v;
+}
+
+bool Expr::isConstExpr() const {
+	return constExpr_;
+}
+
+void Expr::setConstExpr(bool v) {
+	constExpr_ = v;
+}
+
+SemaTypePtr Lval::type() const {
+	return resolvedType_;
+}
+
+void Lval::setType(SemaTypePtr type) {
+	resolvedType_ = std::move(type);
+}
+
+bool Lval::isAssignable() const {
+	return assignable_;
+}
+
+void Lval::setAssignable(bool v) {
+	assignable_ = v;
+}
+
 Rval::Rval(SourceLoc l) : Expr(l) {}
 
 Type::Type(SourceLoc l, DataType b, vec<std::optional<int>> d)

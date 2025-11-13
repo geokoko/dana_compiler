@@ -11,6 +11,7 @@
 
 #include "../common/source_location.hpp"
 #include "../common/types.hpp"
+#include "../symbol/sematype.hpp"
 #include "operators.hpp"
 
 
@@ -48,11 +49,24 @@ inline std::ostream& operator<<(std::ostream& out, const ASTNode& node) {
 
 // Expression nodes
 class Expr : public ASTNode {
+protected:
+    SemaTypePtr resolvedType_;
+    bool isLValue_ = false;
+    bool assignable_ = false;
+    bool constExpr_ = false;
 public:
     explicit Expr(SourceLoc loc);
     virtual ~Expr() = default;
     virtual void sem(SemContext& ctx) override = 0;
     virtual void print(std::ostream &out) const override = 0;
+	SemaTypePtr type() const;
+	void setType(SemaTypePtr type);
+	bool isLValue() const;
+	void setLValue(bool v);
+	bool isAssignable() const;
+	void setAssignable(bool v);
+	bool isConstExpr() const;
+	void setConstExpr(bool v);
 };
 
 // Statements
@@ -66,15 +80,24 @@ public:
 
 // L-values - the left part of an assignment statement
 class Lval : public ASTNode {
+protected:
+	SemaTypePtr resolvedType_;
+	bool assignable_ = true;
 public:
     explicit Lval(SourceLoc l);
     virtual ~Lval() override = default;
     void sem(SemContext& ctx) override = 0;
     virtual void print(std::ostream& out) const override = 0;
+	SemaTypePtr type() const;
+	void setType(SemaTypePtr type);
+	bool isAssignable() const;
+	void setAssignable(bool v);
 };
 
 // R-Values are expressions - the right part of an assignment statement
 class Rval : public Expr {
+protected:
+	bool assignable_ = false;
 public:
     explicit Rval(SourceLoc l);
     virtual ~Rval() override = default;
