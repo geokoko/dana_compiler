@@ -175,6 +175,8 @@ protected:
 public:
     FParDef(SourceLoc l, vec<string> names, up<FParType> t);
     void sem(SemContext& ctx) override;
+	const vec<string>& names() const;
+	const FParType* parameterType() const;
     void print(std::ostream& out) const override;
 };
 
