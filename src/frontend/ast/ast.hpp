@@ -192,6 +192,7 @@ public:
     void sem(SemContext& context) override;
 	const string& identifier() const;
 	const vec<up<FParDef>>& parameters() const;
+	optional<DataType> returnType() const;
     void print(std::ostream& out) const override;
 };
 

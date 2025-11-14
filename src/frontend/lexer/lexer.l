@@ -10,17 +10,16 @@
 
 	#define EMIT_AUTOEND_IF_NEEDED() \
     do { \
-        if (atLineStart && checkIndentation(columno)) { \
+        if (atLineStart && checkIndentation(yylloc->begin.column)) { \
             yyless(0); \
             return parser::token::T_AUTO_END; \
         } \
     } while(0)
 
+	/* This runs at the beginning of each token match */
+	#define YY_USER_ACTION (yylloc->begin = yylloc->end);
 	#define YY_DECL int yylex(parser::semantic_type* yylval, parser::location_type* yylloc)
-	#define YY_USER_ACTION yylloc->columns(yyleng);
 
-	static int lineno = 1;
-	static int columno = 1;
 	static int commentDepth = 0;
 
 	/* Layout management
@@ -34,12 +33,12 @@
 	static bool atLineStart = true;
 	
 	/* Declaration of lexer helper functions */
-	static inline void pushGuide(const char* guide_name, int guide_col);
+	static inline void pushGuide(const char* guide_name, int guide_col, int guide_line);
 	static inline void popGuide();
 	static inline bool checkIndentation(int curr_col);
-	static inline void handleNewLine(parser::location_type& yylloc);
-	static inline char processEscape(const char* text, int pos);
-	static inline std::string processStringEscapes(const char* input);
+	static inline void handleNewLine(parser::location_type* yylloc);
+	static inline char processEscape(const char* text, int pos, const parser::location_type* yylloc);
+	static inline std::string processStringEscapes(const char* input, const parser::location_type* yylloc);
 %}
 
 %option noyywrap nodefault nounput
@@ -90,76 +89,76 @@ ID_CHAR [a-zA-Z0-9_]
 "def"					{ 
 	/* Guide token */
 	EMIT_AUTOEND_IF_NEEDED();
-	pushGuide("def", columno);
+	pushGuide("def", yylloc->begin.column, yylloc->begin.line);
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_DEF; 
 }
 "if"					{ 
 	/* Guide token */
 	EMIT_AUTOEND_IF_NEEDED();
-	pushGuide("if", columno); 
+	pushGuide("if", yylloc->begin.column, yylloc->begin.line); 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_IF; 
 }
 "elif"					{ 
 	/* Guide token */
 	EMIT_AUTOEND_IF_NEEDED();
-	pushGuide("elif", columno); 
+	pushGuide("elif", yylloc->begin.column, yylloc->begin.line); 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_ELIF; 
 }
 "else"					{ 
 	/* Guide token */
 	EMIT_AUTOEND_IF_NEEDED();
-	pushGuide("else", columno); 
+	pushGuide("else", yylloc->begin.column, yylloc->begin.line); 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_ELSE; 
 }
 
 "loop"					{ 
 	/* Guide token */
 	EMIT_AUTOEND_IF_NEEDED();
-	pushGuide("loop", columno); 
+	pushGuide("loop", yylloc->begin.column, yylloc->begin.line); 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_LOOP; 
 }
 
 "and"					{ 
 	/* Keyword */
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_AND; 
 }
 "is"					{ 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_IS; 
 }
 "skip"					{ 
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_SKIP; 
 }
 "as"					{ 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_AS; 
 }
 "int"					{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_INT; 
 }
 "true"					{ 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_TRUE; 
 }
 "begin"					{ 
@@ -170,77 +169,77 @@ ID_CHAR [a-zA-Z0-9_]
 	}
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_BEGIN; 
 }
 "var"					{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_VAR; 
 }
 "break"					{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_BREAK; 
 }
 "end"					{ 
 	/* Explicit end of an explicit block: no off-side handling. */
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_END; 
 }
 "not"					{ 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_NOT; 
 }
 "byte"					{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_BYTE; 
 }
 "exit"					{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_EXIT; 
 }
 "or"					{ 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_OR; 
 }
 "continue"				{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_CONT; 
 }
 
 "false"					{ 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_FALSE; 
 }
 "ref"					{ 
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_REF; 
 }
 "decl"					{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_DECL; 
 }
 "return"				{
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_RET; 
 }
 
@@ -248,15 +247,16 @@ ID_CHAR [a-zA-Z0-9_]
 				   BEGIN(COMMENT); }
 <COMMENT>"*)" 	 { commentDepth--;
 				   if(commentDepth == 0) {
-					columno += yyleng;		//For the case that there is code after the comment in the same line	
-				    atLineStart = false;
+				    yylloc->columns(yyleng);
+					atLineStart = false;
 				    BEGIN(INITIAL); }
 				 }
-<COMMENT>\n 	 { handleNewLine(*yylloc); }
-<COMMENT>"*" 	 { columno += 1; }
-<COMMENT>[^*\n]+ { columno += yyleng; }		//Track column if code follows
+<COMMENT>\n 	 { handleNewLine(yylloc); }
+<COMMENT>"*" 	 { yylloc->columns(1); }			//Track column if only '*' encountered
+<COMMENT>[^*\n]+ { yylloc->columns(yyleng); }		//Track column if code follows
 <COMMENT><<EOF>> {
-    fprintf(stderr, "Error: EOF reached inside a comment at line %d\n", lineno);
+    fprintf(stderr, "Error: EOF reached inside a comment at line %d\n",
+			static_cast<int>(yylloc->begin.line));
     exit(1);
 }
 
@@ -265,7 +265,7 @@ ID_CHAR [a-zA-Z0-9_]
 	/* Integer constant */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	yylval->emplace<int>(std::stoi(yytext));
 	return parser::token::T_INT_CONST;
 }
@@ -274,10 +274,10 @@ ID_CHAR [a-zA-Z0-9_]
 	/* Character constant with escape handling */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	char c;
 	if (yytext[1] == '\\')
-		c = processEscape(yytext, 1);
+		c = processEscape(yytext, 1, yylloc);
 	else
 		c = yytext[1];
 
@@ -289,7 +289,7 @@ ID_CHAR [a-zA-Z0-9_]
 	/* Identifier */
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	yylval->emplace<std::string>(yytext);
 	return parser::token::T_ID;
 }
@@ -299,8 +299,8 @@ ID_CHAR [a-zA-Z0-9_]
 	/* String constant with escape handling */
 	EMIT_AUTOEND_IF_NEEDED();
 	atLineStart = false;
-	columno += yyleng;
-	std::string s = processStringEscapes(yytext);
+	yylloc->columns(yyleng);
+	std::string s = processStringEscapes(yytext, yylloc);
 	
 	yylval->emplace<std::string>(std::move(s));
 	return parser::token::T_STRING_CONST;
@@ -311,28 +311,28 @@ ID_CHAR [a-zA-Z0-9_]
 	/* Assignment operator */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_ASSIGN; 
 }
 "<>"                    { 
 	/* Not equal operator */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_NE; 
 }
 "<="                    { 
 	/* Less than or equal operator */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_LE; 
 }
 ">="                    { 
 	/* Greater than or equal operator */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return parser::token::T_GE; 
 }
 
@@ -341,7 +341,7 @@ ID_CHAR [a-zA-Z0-9_]
 	/* Single-character operators */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return yytext[0]; 
 }
 
@@ -350,35 +350,37 @@ ID_CHAR [a-zA-Z0-9_]
 	/* Bitwise NOT operator */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return '!'; 
 }
 "|"						{ 
 	/* Bitwise OR operator */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return '|'; 
 }
 "&" 					{ 
 	/* Bitwise AND operator */
 
 	atLineStart = false;
-	columno += yyleng;
+	yylloc->columns(yyleng);
 	return '&'; 
 }
 
-[ ]+					{ columno += yyleng; /* ignore spaces but track column */ }
+[ \t]+					{ yylloc->columns(yyleng); /* ignore spaces but track column */ }
 \r						{ /* ignore carriage return */ }
-\t						{ columno += 8; /* assuming tab width of 8 */ }
-\n+						{ handleNewLine(*yylloc); }
+\n+						{ handleNewLine(yylloc); }
 
-#.*\n					{ handleNewLine(*yylloc); }
+#.*\n					{ handleNewLine(yylloc); }
 
 .						{ 
 	/* Error handling for illegal characters */
-	fprintf(stderr, "Error: Illegal character '%c' at line %d, column %d\n", yytext[0], lineno, columno);
-	columno++; 
+	fprintf(stderr, "Error: Illegal character '%c' at line %d, column %d\n",
+			yytext[0],
+			static_cast<int>(yylloc->begin.line),
+			static_cast<int>(yylloc->begin.column));
+	yylloc->columns(1);
 }
 
 %%
@@ -386,10 +388,10 @@ ID_CHAR [a-zA-Z0-9_]
 /* Implementation of lexer helper functions */
 
 // Guide token encountered (push)
-static inline void pushGuide (const char* guide_name, int guide_col) {
+static inline void pushGuide (const char* guide_name, int guide_col, int guide_line) {
 	(void)guide_name;
 	if (cur_indent_level >= MAX_INDENT_LEVELS) {
-		fprintf(stderr, "Error: Too many nested levels at line %d\n", lineno);
+		fprintf(stderr, "Error: Too many nested levels at line %d\n", guide_line);
 		exit(1);
 	}
 
@@ -427,18 +429,17 @@ static inline bool checkIndentation (int cur_col) {
 }
 
 // Handle newline - reset column and set line start flag - also check if auto-end must be emitted - if yes emit
-static inline void handleNewLine(parser::location_type& yylloc) {
-	lineno++;
-	columno = 1;
+static inline void handleNewLine(parser::location_type* yylloc) {
 	atLineStart = true;
-	yylloc.lines(yyleng);
-	yylloc.step();
+	yylloc->lines(yyleng);
+	yylloc->step();
 }
 
 // Escape processing functions
-static inline char processEscape(const char* text, int pos) {
-		char escape_char = text[pos + 1];
-		size_t text_len = std::strlen(text);
+static inline char processEscape(const char* text, int pos, const parser::location_type* yylloc) {
+	const int line = yylloc ? static_cast<int>(yylloc->begin.line) : 0;
+	char escape_char = text[pos + 1];
+	size_t text_len = std::strlen(text);
 	
 	switch (escape_char) {
 		case 'n':  return '\n';
@@ -460,15 +461,15 @@ static inline char processEscape(const char* text, int pos) {
 					return (char)(val1 * 16 + val2); // here returning ASCII char
 				}
 			}
-			fprintf(stderr, "Error: Invalid hex escape at line %d\n", lineno);
+			fprintf(stderr, "Error: Invalid hex escape at line %d\n", line);
 			return 0;
 		default:
-			fprintf(stderr, "Warning: Unknown escape sequence \\%c at line %d\n", escape_char, lineno);
+			fprintf(stderr, "Warning: Unknown escape sequence \\%c at line %d\n", escape_char, line);
 			return escape_char;
 	}
 }
 
-static inline std::string processStringEscapes(const char* input) {
+static inline std::string processStringEscapes(const char* input, const parser::location_type* yylloc) {
 	int len = std::strlen(input);
 	std::string result;
 	result.reserve(len); // avoids reallocations
@@ -477,7 +478,7 @@ static inline std::string processStringEscapes(const char* input) {
 	while (i < len - 1) { // Until before closing quote
 		if (input[i] == '\\') {
 			// Handle escape sequence
-			char c = processEscape(input, i);
+			char c = processEscape(input, i, yylloc);
 			result.push_back(c);
 
 			// Skip over the escape sequence in the source text

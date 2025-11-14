@@ -3,14 +3,14 @@
 #include <string>
 
 enum class DataType {
-    Int,
-    Byte
+    INT,
+    BYTE
 };
 
 inline const char* dataTypeName(DataType type) {
     switch (type) {
-        case DataType::Int:  return "int";
-        case DataType::Byte: return "byte";
+        case DataType::INT:  return "int";
+        case DataType::BYTE: return "byte";
     }
     return "<?>";
 }

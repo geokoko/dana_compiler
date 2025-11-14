@@ -14,7 +14,7 @@ namespace {
 
 	/* Converts the frontend DataType enum to the corresponding semantic type */
 	SemaTypePtr scalarType(DataType dt) {
-		return dt == DataType::Int ? makeIntType() : makeByteType();
+		return dt == DataType::INT ? makeIntType() : makeByteType();
 	}
 
 	/* Compares two semantic types for equality */
