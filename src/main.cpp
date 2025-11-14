@@ -1,9 +1,12 @@
-#include <iostream>
 #include <cstdio>
+#include <iostream>
 #include <string>
-#include "./frontend/parser/parser.tab.hh"
-// Bring in AST types and printing support
+
 #include "./frontend/ast/ast.hpp"
+#include "./frontend/parser/parser.tab.hh"
+#include "./frontend/semantic/diagnostics.hpp"
+#include "./frontend/semantic/sema_context.hpp"
+#include "./frontend/symbol/symbol_table.hpp"
 
 extern FILE* yyin;
 
@@ -53,19 +56,30 @@ int main(int argc, char** argv) {
 
     std::fclose(yyin);
 
-    if (res == 0) {
-        std::cout << "Parsing finished: success (parse() returned 0)\n";
-        if (want_tree) {
-            if (ast_root) {
-                // Pretty tree output is implemented by print()
-                ast_root->print(std::cout);
-            } else {
-                std::cout << "AST: null (no AST produced)\n";
-            }
-        }
-    } else {
+    if (res != 0) {
         std::cerr << "Parsing finished: failure (parse() returned " << res << ")\n";
+        return res;
     }
 
-    return res;
+    if (!ast_root) {
+        std::cerr << "Parsing produced no AST\n";
+        return 1;
+    }
+
+    if (want_tree) {
+        ast_root->print(std::cout);
+    }
+
+    SymbolTable symtab;
+    Diagnostics diags;
+    SemContext semCtx(symtab, diags);
+
+    ast_root->sem(semCtx);
+
+    if (semCtx.hasErrors()) {
+        semCtx.printDiagnostics();
+        return 1;
+    }
+
+    return 0;
 }

@@ -106,12 +106,12 @@
 %type <optional<string>> 					opt_id	// optional identifier
 
 /* Define operator precedence */
-%left '|' T_OR
-%left '&' T_AND
-
-%left '+' '-'
-%left '*' '/' '%'
 %precedence UPLUS UMINUS '!' T_NOT
+%left '&' T_AND
+%left '|' T_OR
+%left '*' '/' '%'
+%left '+' '-'
+%nonassoc '=' T_NE T_LE T_GE '<' '>'
 
 %%
 
@@ -150,8 +150,8 @@ var_def
 	;
 
 type
-	: T_INT  type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::Int,  std::move($2)); }
-	| T_BYTE type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::Byte, std::move($2)); }
+	: T_INT  type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::INT,  std::move($2)); }
+	| T_BYTE type_dims 							{ $$ = make_unique<Type>(mkLoc(@$), DataType::BYTE, std::move($2)); }
 	;
 
 type_dims
@@ -165,8 +165,8 @@ header
 
 opt_ret_type
 	: %empty									{ $$ = optional<DataType>{}; }
-	| T_IS T_INT     							{ $$ = DataType::Int; }
-	| T_IS T_BYTE    							{ $$ = DataType::Byte; }
+	| T_IS T_INT     							{ $$ = DataType::INT; }
+	| T_IS T_BYTE    							{ $$ = DataType::BYTE; }
 	;
 
 opt_params
@@ -190,22 +190,22 @@ id_list
 
 fpar_type
 	: T_INT {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */false, DataType::Int);
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */false, DataType::INT);
 	  }
 	| T_BYTE {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */false, DataType::Byte);
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */false, DataType::BYTE);
 	  }
 	| T_INT fpar_dims {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Int, std::move($2)); 
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::INT, std::move($2)); 
 	  }
 	| T_BYTE fpar_dims {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Byte, std::move($2));
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::BYTE, std::move($2));
 	  }
 	| T_REF T_INT {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Int); 
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::INT); 
 	  }
 	| T_REF T_BYTE {
-		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::Byte); 
+		$$ = make_unique<FParType>(mkLoc(@$), /* by-ref= */true, DataType::BYTE); 
 	  }
 	;
 

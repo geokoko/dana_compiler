@@ -2,11 +2,64 @@
 
 ASTNode::ASTNode(SourceLoc loc) : loc(loc) {}
 
+ASTNode::~ASTNode() = default;
+
 Expr::Expr(SourceLoc loc) : ASTNode(loc) {}
+Expr::~Expr() = default;
 
 Stmt::Stmt(SourceLoc l) : ASTNode(l) {}
+Stmt::~Stmt() = default;
 
 Lval::Lval(SourceLoc l) : ASTNode(l) {}
+Lval::~Lval() = default;
+
+SemaTypePtr Expr::type() const {
+	return resolvedType_;
+}
+
+void Expr::setType(SemaTypePtr type) {
+	resolvedType_ = std::move(type);
+}
+
+bool Expr::isLValue() const {
+	return isLValue_;
+}
+
+void Expr::setLValue(bool v) {
+	isLValue_ = v;
+}
+
+bool Expr::isAssignable() const {
+	return assignable_;
+}
+
+void Expr::setAssignable(bool v) {
+	assignable_ = v;
+}
+
+bool Expr::isConstExpr() const {
+	return constExpr_;
+}
+
+void Expr::setConstExpr(bool v) {
+	constExpr_ = v;
+}
+
+SemaTypePtr Lval::type() const {
+	return resolvedType_;
+}
+
+void Lval::setType(SemaTypePtr type) {
+	resolvedType_ = std::move(type);
+}
+
+bool Lval::isAssignable() const {
+	return assignable_;
+}
+
+void Lval::setAssignable(bool v) {
+	assignable_ = v;
+}
 
 Rval::Rval(SourceLoc l) : Expr(l) {}
 
@@ -35,11 +88,31 @@ FParType::FParType(SourceLoc l, bool ref, DataType type)
 FParType::FParType(SourceLoc l, bool ref, DataType type, vec<std::optional<int>> d)
     : Type(l, type, std::move(d)), by_ref(ref) {}
 
+bool FParType::isByRef() const {
+	return by_ref;
+}
+
 FParDef::FParDef(SourceLoc l, vec<string> names, up<FParType> t)
     : Def(l), identifiers(std::move(names)), type(std::move(t)) {}
 
+const vec<string>& FParDef::names() const {
+	return identifiers;
+}
+
+const FParType* FParDef::parameterType() const {
+	return type.get();
+}
+
 Header::Header(SourceLoc l, string n, optional<DataType> r, vec<up<FParDef>> p)
     : Def(l), name(std::move(n)), return_type(std::move(r)), params(std::move(p)) {}
+
+const string& Header::identifier() const {
+	return name;
+}
+
+const vec<up<FParDef>>& Header::parameters() const {
+	return params;
+}
 
 VarDef::VarDef(SourceLoc l, vec<string> ids, up<Type> t)
     : Def(l), names(std::move(ids)), declared_type(std::move(t)) {}
@@ -137,27 +210,4 @@ BinaryCond::BinaryCond(SourceLoc l, LogicOp operation, up<Cond> left, up<Cond> r
 RelCond::RelCond(SourceLoc l, RelOp operation, up<Expr> left, up<Expr> right)
     : Cond(l), op(operation), lhs(std::move(left)), rhs(std::move(right)) {}
 
-// ---- Default no-op semantic passes ----
-void ASTNode::sem() {}
-void Stmt::sem() {}
-void Lval::sem() {}
-void Type::sem() {}
-void Block::sem() {}
-void Def::sem() {}
-void FParType::sem() {}
-void FParDef::sem() {}
-void Header::sem() {}
-void VarDef::sem() {}
-void FuncDecl::sem() {}
-void FuncDef::sem() {}
-void LValueExpr::sem() {}
-void ParenExpr::sem() {}
-void FuncCall::sem() {}
-void UnaryExpr::sem() {}
-void BinaryExpr::sem() {}
-void IntConst::sem() {}
-void CharConst::sem() {}
-void TrueConst::sem() {}
-void FalseConst::sem() {}
-void Cond::sem() {}
-void Rval::sem() {}
+void Type::sem(SemContext&) {}

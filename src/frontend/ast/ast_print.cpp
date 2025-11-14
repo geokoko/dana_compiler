@@ -5,91 +5,91 @@
 #include <vector>
 
 namespace tree {
-// Stack of whether each ancestor is the last child
-thread_local std::vector<bool> last;
+	// Stack of whether each ancestor is the last child
+	thread_local std::vector<bool> last;
 
-inline void prefix(std::ostream& out) {
-	for (std::size_t i = 0; i + 1 < last.size(); ++i) {
-		out << (last[i] ? "    " : "│   ");
-	}
-}
-
-// Print a single tree line
-inline void line(std::ostream& out, const std::string& text) {
-	if (last.empty()) {
-		out << text << '\n';
-	} else {
-		prefix(out);
-		out << (last.back() ? "└── " : "├── ") << text << '\n';
-	}
-}
-
-// Escapes a string for safe single-line display
-inline std::string escape(const std::string& s) {
-	std::string r;
-	r.reserve(s.size());
-	for (unsigned char c : s) {
-		switch (c) {
-			case '\\': r += "\\\\"; break;
-			case '"':  r += "\\\""; break;
-			case '\n': r += "\\n"; break;
-			case '\r': r += "\\r"; break;
-			case '\t': r += "\\t"; break;
-			default:
-				if (c < 0x20) {
-					char buf[5];
-					std::snprintf(buf, sizeof(buf), "\\x%02X", static_cast<unsigned>(c));
-					r += buf;
-				} else {
-					r.push_back(static_cast<char>(c));
-				}
+	inline void prefix(std::ostream& out) {
+		for (std::size_t i = 0; i + 1 < last.size(); ++i) {
+			out << (last[i] ? "    " : "│   ");
 		}
 	}
-	return r;
-}
 
-inline std::string quote(const std::string& s) {
-	return std::string("\"") + escape(s) + "\"";
-}
-
-// Child helpers
-template <class T>
-inline void child(std::ostream& out, const up<T>& ptr, bool is_last) {
-	last.push_back(is_last);
-	if (ptr) ptr->print(out); else line(out, "null");
-	last.pop_back();
-}
-
-template <class T>
-inline void children(std::ostream& out, const vec<up<T>>& xs) {
-	for (std::size_t i = 0; i < xs.size(); ++i) {
-		child(out, xs[i], i + 1 == xs.size());
+	// Print a single tree line
+	inline void line(std::ostream& out, const std::string& text) {
+		if (last.empty()) {
+			out << text << '\n';
+		} else {
+			prefix(out);
+			out << (last.back() ? "└── " : "├── ") << text << '\n';
+		}
 	}
-}
 
-// Small format helpers
-inline std::string tag(const char* name, const SourceLoc& loc) {
-	std::ostringstream oss;
-	oss << name << '[' << loc.line << ':' << loc.col << ']';
-	return oss.str();
-}
-
-inline std::string join(const vec<string>& xs, const char* sep = ", ") {
-	std::string r;
-	for (std::size_t i = 0; i < xs.size(); ++i) { if (i) r += sep; r += xs[i]; }
-	return r;
-}
-
-inline std::string dims_str(const vec<std::optional<int>>& dims) {
-	std::ostringstream oss;
-	oss << '[';
-	for (std::size_t i = 0; i < dims.size(); ++i) {
-		if (i) oss << ", ";
-		if (dims[i]) oss << *dims[i]; else oss << '?';
+	// Escapes a string for safe single-line display
+	inline std::string escape(const std::string& s) {
+		std::string r;
+		r.reserve(s.size());
+		for (unsigned char c : s) {
+			switch (c) {
+				case '\\': r += "\\\\"; break;
+				case '"':  r += "\\\""; break;
+				case '\n': r += "\\n"; break;
+				case '\r': r += "\\r"; break;
+				case '\t': r += "\\t"; break;
+				default:
+					if (c < 0x20) {
+						char buf[5];
+						std::snprintf(buf, sizeof(buf), "\\x%02X", static_cast<unsigned>(c));
+						r += buf;
+					} else {
+						r.push_back(static_cast<char>(c));
+					}
+			}
+		}
+		return r;
 	}
-	oss << ']';
-	return oss.str();
-}
+
+	inline std::string quote(const std::string& s) {
+		return std::string("\"") + escape(s) + "\"";
+	}
+
+	// Child helpers
+	template <class T>
+	inline void child(std::ostream& out, const up<T>& ptr, bool is_last) {
+		last.push_back(is_last);
+		if (ptr) ptr->print(out); else line(out, "null");
+		last.pop_back();
+	}
+
+	template <class T>
+	inline void children(std::ostream& out, const vec<up<T>>& xs) {
+		for (std::size_t i = 0; i < xs.size(); ++i) {
+			child(out, xs[i], i + 1 == xs.size());
+		}
+	}
+
+	// Small format helpers
+	inline std::string tag(const char* name, const SourceLoc& loc) {
+		std::ostringstream oss;
+		oss << name << '[' << loc.line << ':' << loc.col << ']';
+		return oss.str();
+	}
+
+	inline std::string join(const vec<string>& xs, const char* sep = ", ") {
+		std::string r;
+		for (std::size_t i = 0; i < xs.size(); ++i) { if (i) r += sep; r += xs[i]; }
+		return r;
+	}
+
+	inline std::string dims_str(const vec<std::optional<int>>& dims) {
+		std::ostringstream oss;
+		oss << '[';
+		for (std::size_t i = 0; i < dims.size(); ++i) {
+			if (i) oss << ", ";
+			if (dims[i]) oss << *dims[i]; else oss << '?';
+		}
+		oss << ']';
+		return oss.str();
+	}
 } // namespace tree
 
 // ---- Printing implementations ----
