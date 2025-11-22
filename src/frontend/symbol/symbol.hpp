@@ -13,7 +13,6 @@ public:
 		VAR,
 		PARAM,
 		FUNC,
-		PROC,
 		LABEL
 	};
 
@@ -30,7 +29,6 @@ public:
 	bool isVariable() const;
 	bool isParameter() const;
 	bool isFunction() const;
-	bool isProcedure() const;
 	bool isLabel() const;
 
 	void markForwardDeclaration();
@@ -66,32 +64,23 @@ private:
 	ParamPass pass_;
 };	
 
+// Note: A FuncSymbol's type is its signature type (return type + parameter types)
 class FuncSymbol : public Symbol {
 public:
-	FuncSymbol(std::string name, SemaTypePtr returnType, SourceLoc loc):
-		Symbol(std::move(name), SymKind::FUNC, std::move(returnType), loc) {};
+	FuncSymbol(std::string name, SemaTypePtr sigType, bool isProc, SourceLoc loc):
+		Symbol(std::move(name), SymKind::FUNC, std::move(sigType), loc), isProcedure_(isProc) {};
+	
 	void addParam(std::shared_ptr<ParamSymbol> param);
 	const std::vector<std::shared_ptr<ParamSymbol>>& getParams() const;
-	const SemaTypePtr& getReturnType() const;
-	SemaTypePtr setReturnType(SemaTypePtr returnType);
+	bool isProcedure () const;
 	void clearParams();
 
 private:
 	std::vector<std::shared_ptr<ParamSymbol>> params_;
-	SemaTypePtr returnType_;
+	bool isProcedure_;	
 };
 
-class ProcSymbol : public Symbol {
-public:
-	ProcSymbol(std::string name, SemaTypePtr procType, SourceLoc loc):
-		Symbol(std::move(name), SymKind::PROC, std::move(procType), loc) {};
-	void addParam(std::shared_ptr<ParamSymbol> param);
-	const std::vector<std::shared_ptr<ParamSymbol>>& getParams() const;
-	void clearParams();
-private:
-	std::vector<std::shared_ptr<ParamSymbol>> params_;
-};
-
+// not used for now
 class LabelSymbol : public Symbol {
 public:
 	LabelSymbol(std::string name, SourceLoc loc):

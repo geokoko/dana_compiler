@@ -36,10 +36,6 @@ bool Symbol::isFunction() const {
 	return kind_ == SymKind::FUNC;
 }
 
-bool Symbol::isProcedure() const {
-	return kind_ == SymKind::PROC;
-}
-
 bool Symbol::isLabel() const {
 	return kind_ == SymKind::LABEL;
 }
@@ -68,6 +64,10 @@ Symbol::ParamPass ParamSymbol::getPass() const {
     return pass_;
 }
 
+bool FuncSymbol::isProcedure() const {
+	return isProcedure_; 
+}
+
 void FuncSymbol::addParam(std::shared_ptr<ParamSymbol> param) {
     if (param) {
         params_.push_back(std::move(param));
@@ -78,30 +78,7 @@ const std::vector<std::shared_ptr<ParamSymbol>>& FuncSymbol::getParams() const {
     return params_;
 }
 
-const SemaTypePtr& FuncSymbol::getReturnType() const {
-    return returnType_;
-}
-
-SemaTypePtr FuncSymbol::setReturnType(SemaTypePtr returnType) {
-    SemaTypePtr previous = std::move(returnType_);
-    returnType_ = std::move(returnType);
-    return previous;
-}
-
 void FuncSymbol::clearParams() {
 	params_.clear();
 }
 
-void ProcSymbol::addParam(std::shared_ptr<ParamSymbol> param) {
-    if (param) {
-        params_.push_back(std::move(param));
-    }
-}
-
-const std::vector<std::shared_ptr<ParamSymbol>>& ProcSymbol::getParams() const {
-    return params_;
-}
-
-void ProcSymbol::clearParams() {
-	params_.clear();
-}

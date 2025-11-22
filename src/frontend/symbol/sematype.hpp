@@ -61,6 +61,11 @@ private:
     std::optional<std::size_t> size_;
 };
 
+/* Function types refer to their signature type
+ * Reminder: two functions/procedures have the same type
+ * if they have the same signature
+ * */
+
 // ---------- Function type ----------
 
 class FuncType : public SemaType {

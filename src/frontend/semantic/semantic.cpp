@@ -144,17 +144,18 @@ namespace {
 		return resolved;
 	}
 
+	SemaTypePtr buildFunctionSignature(const SemContext::HeaderInfo& info) {
+		std::vector<SemaTypePtr> paramTypes;
+		paramTypes.reserve(info.params.size());
+		for (const auto& param : info.params) {
+			paramTypes.push_back(param.type);
+		}
+		return makeFuncType(info.returnType, std::move(paramTypes));
+	}
+
 	/* Sets function/procedure parameters from header info into the given symbol */
 	void setSymbolParamsFromHeader(Symbol* symbol, const SemContext::HeaderInfo& info) {
-		if (!symbol) {
-			return;
-		}
-		if (info.isProcedure) {
-			auto* proc = static_cast<ProcSymbol*>(symbol);
-			proc->clearParams();
-			for (const auto& param : info.params) {
-				proc->addParam(std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc));
-			}
+		if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
 			return;
 		}
 		auto* func = static_cast<FuncSymbol*>(symbol);
@@ -164,36 +165,20 @@ namespace {
 		}
 	}
 
-	/* Retrieves function/procedure parameters from a symbol */
-	const std::vector<std::shared_ptr<ParamSymbol>>& getSymbolParams(const Symbol* symbol) {
-		static const std::vector<std::shared_ptr<ParamSymbol>> empty;
-		if (!symbol) {
-			return empty;
-		}
-		if (symbol->getKind() == Symbol::SymKind::FUNC) {
-			return static_cast<const FuncSymbol*>(symbol)->getParams();
-		}
-		if (symbol->getKind() == Symbol::SymKind::PROC) {
-			return static_cast<const ProcSymbol*>(symbol)->getParams();
-		}
-		return empty;
-	}
-
 	/* Checks if a function/procedure signature matches the provided header info */
 	bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
-		if (!symbol) {
+		if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
 			return false;
 		}
-		if (info.isProcedure && symbol->getKind() != Symbol::SymKind::PROC) {
+		const auto* func = static_cast<const FuncSymbol*>(symbol);
+		if (func->isProcedure() != info.isProcedure) {
 			return false;
 		}
-		if (!info.isProcedure && symbol->getKind() != Symbol::SymKind::FUNC) {
+		auto expectedSig = buildFunctionSignature(info);
+		if (!typesEqual(expectedSig, func->getType())) {
 			return false;
 		}
-		if (!info.isProcedure && !typesEqual(info.returnType, symbol->getType())) {
-			return false;
-		}
-		const auto& params = getSymbolParams(symbol);
+		const auto& params = func->getParams();
 		if (params.size() != info.params.size()) {
 			return false;
 		}
@@ -272,12 +257,8 @@ namespace {
 	}
 
 	std::unique_ptr<Symbol> makeFunctionSymbol(const SemContext::HeaderInfo& info) {
-		if (info.isProcedure) {
-			auto proc = std::make_unique<ProcSymbol>(info.name, makeVoidType(), info.loc);
-			setSymbolParamsFromHeader(proc.get(), info);
-			return proc;
-		}
-		auto func = std::make_unique<FuncSymbol>(info.name, info.returnType, info.loc);
+		auto sig = buildFunctionSignature(info);
+		auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
 		setSymbolParamsFromHeader(func.get(), info);
 		return func;
 	}
@@ -557,11 +538,14 @@ void ReturnStmt::sem(SemContext& context) {
 void ProcCall::sem(SemContext& context) {
 	auto lookup = context.lookupSymbol(name);
 	Symbol* symbol = lookup.symbol;
-	if (!symbol || symbol->getKind() != Symbol::SymKind::PROC) {
+	auto* funcSym = (symbol && symbol->getKind() == Symbol::SymKind::FUNC)
+		? static_cast<FuncSymbol*>(symbol)
+		: nullptr;
+	if (!funcSym || !funcSym->isProcedure()) {
 		context.diags().error(loc, "unknown procedure '" + name + "'");
 		return;
 	}
-	const auto& params = getSymbolParams(symbol);
+	const auto& params = funcSym->getParams();
 	checkArguments(args, params, context, name, loc);
 }
 
@@ -671,14 +655,18 @@ void ParenExpr::sem(SemContext& context) {
 void FuncCall::sem(SemContext& context) {
 	auto lookup = context.lookupSymbol(name);
 	Symbol* symbol = lookup.symbol;
-	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
+	auto* funcSym = (symbol && symbol->getKind() == Symbol::SymKind::FUNC)
+		? static_cast<FuncSymbol*>(symbol)
+		: nullptr;
+	if (!funcSym || funcSym->isProcedure()) {
 		context.diags().error(loc, "unknown function '" + name + "'");
 		setType(nullptr);
 		return;
 	}
-	const auto& params = getSymbolParams(symbol);
+	const auto& params = funcSym->getParams();
 	checkArguments(args, params, context, name, loc);
-	setType(symbol->getType());
+	const auto* sig = static_cast<const FuncType*>(funcSym->getType().get());
+	setType(sig ? sig->returnType() : SemaTypePtr{});
 	setLValue(false);
 	setAssignable(false);
 }
