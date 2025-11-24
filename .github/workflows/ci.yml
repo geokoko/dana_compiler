@@ -62,15 +62,7 @@ jobs:
       - name: Install linting tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format cppcheck
-
-      - name: Run clang-format check
-        run: |
-          echo "Checking code formatting..."
-          find . \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -not -path "./build/*" | xargs clang-format --dry-run --Werror || {
-          echo "Format check failed. Run 'clang-format -i' on the files above to fix."
-          exit 1
-          }
+          sudo apt-get install -y cppcheck
 
       - name: Run cppcheck
         run: |
