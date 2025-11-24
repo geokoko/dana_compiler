@@ -144,9 +144,9 @@ namespace {
 
 	/* Builds any semantic type from a AST captured info into an array type (or a base type, if no dims are present) */
 	/* If allowUnsizedFirst is true, the first dimension can be unsized (for parameters) */
-	SemaTypePtr buildArrayType(const SourceLoc& loc, SemaTypePtr base, const vec<std::optional<int>>& dims, bool allowUnsizedFirst,
-							   SemContext& context) {
-		
+	SemaTypePtr buildArrayType(const SourceLoc& loc, SemaTypePtr base, const vec<std::optional<int>>& dims, 
+							bool allowUnsizedFirst, SemContext& context) 
+	{
 		SemaTypePtr result = std::move(base); // first move the scalar type to result
 		for (std::size_t i = dims.size(); i-- > 0;) {
 			const bool allowUnsized = allowUnsizedFirst && i == 0;
@@ -445,6 +445,7 @@ void FuncDef::sem(SemContext& context) {
 	}
 
 	context.openScope();
+	// create a function frame and store inside SemContext driver
 	SemContext::FunctionFrame frame;
 	frame.symbol = symbol;
 	frame.isProcedure = info->isProcedure;
