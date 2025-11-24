@@ -22,11 +22,11 @@ jobs:
 
       - name: Build project
         run: |
-          make clean
-          make
+          cd src && make
 
       - name: Check build artifacts
         run: |
+          cd src
           if [ ! -f dana_compiler ]; then
           echo "Error: Compiler executable not found"
           exit 1
@@ -48,8 +48,8 @@ jobs:
 
       - name: Build with Clang
         run: |
-          make clean
-          CXX=clang++ make
+          cd src && make clean
+          cd src && CXX=clang++ make
 
   lint:
     name: Code Linting
