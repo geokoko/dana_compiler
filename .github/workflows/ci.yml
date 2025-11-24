@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cd src
+          make      
+
+      - name: Check build artifacts
+        run: |
+          if [ ! -x src/danac ]; then
+            echo "Executable not found at src/danac"
+            echo "Repo tree:"
+            ls -R .
+            exit 1
+          fi
+
+
+
