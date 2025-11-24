@@ -32,14 +32,6 @@ bool Symbol::isParameter() const {
 	return kind_ == SymKind::PARAM;
 }
 
-bool Symbol::isFunction() const {
-	return kind_ == SymKind::FUNC;
-}
-
-bool Symbol::isLabel() const {
-	return kind_ == SymKind::LABEL;
-}
-
 void Symbol::markForwardDeclaration() {
 	isForward_ = true;
 }
@@ -54,10 +46,6 @@ bool Symbol::isForwardDeclaration() const {
 
 bool Symbol::isDefined() const {
 	return isDefined_;
-}
-
-bool Symbol::needsDefinition() const {
-	return isForward_ && !isDefined_;
 }
 
 Symbol::ParamPass ParamSymbol::getPass() const {
@@ -81,4 +69,3 @@ const std::vector<std::shared_ptr<ParamSymbol>>& FuncSymbol::getParams() const {
 void FuncSymbol::clearParams() {
 	params_.clear();
 }
-

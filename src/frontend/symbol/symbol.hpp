@@ -12,8 +12,7 @@ public:
 	enum class SymKind {
 		VAR,
 		PARAM,
-		FUNC,
-		LABEL
+		FUNC
 	};
 
 	enum class ParamPass {
@@ -28,14 +27,11 @@ public:
 	SourceLoc getLocation() const;
 	bool isVariable() const;
 	bool isParameter() const;
-	bool isFunction() const;
-	bool isLabel() const;
 
 	void markForwardDeclaration();
 	void markDefined();
 	bool isForwardDeclaration() const;
 	bool isDefined() const;
-	bool needsDefinition() const;
 
 protected:
 	Symbol(std::string name, SymKind kind, SemaTypePtr type, SourceLoc loc);
@@ -78,12 +74,4 @@ public:
 private:
 	std::vector<std::shared_ptr<ParamSymbol>> params_;
 	bool isProcedure_;	
-};
-
-// not used for now
-class LabelSymbol : public Symbol {
-public:
-	LabelSymbol(std::string name, SourceLoc loc):
-		Symbol(std::move(name), SymKind::LABEL, nullptr, loc) {};
-
 };

@@ -65,7 +65,6 @@ public:
 
 	void enterFunction(FunctionFrame frame);
 	void leaveFunction();
-	bool insideFunction() const;
 	FunctionFrame* currentFunction();
 	const FunctionFrame* currentFunction() const;
 
