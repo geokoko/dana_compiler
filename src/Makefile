@@ -2,6 +2,22 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -g
 
+# LLVM flags
+LLVM_CONFIG = llvm-config-18
+# Compile C++ using LLVM
+LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags)
+# Link LLVM libs and POSIX libs
+LLVM_LDFLAGS  = $(shell $(LLVM_CONFIG) --ldflags --libs core native) \
+                $(shell $(LLVM_CONFIG) --system-libs)
+
+# Add rpath so danac finds libLLVM at runtime
+# This flag enables the user to run danac executable without LD_LIBRARY_PATH
+LLVM_RPATH = -Wl,-rpath,$(shell $(LLVM_CONFIG) --libdir)
+
+# Append LLVM flags to global gcc flags
+CXXFLAGS += $(LLVM_CXXFLAGS)
+
+# Bison and Flex settings
 BISON := bison
 BISONFLAGS := -Wall -d --skeleton=lalr1.cc
 FLEX := flex
@@ -12,9 +28,13 @@ TARGET = danac
 
 # Source directories
 FRONTEND_DIR = frontend
+BACKEND_DIR = backend
+RUNTIME_DIR = runtime
 LEXER_DIR = $(FRONTEND_DIR)/lexer
 PARSER_DIR = $(FRONTEND_DIR)/parser
 AST_DIR = $(FRONTEND_DIR)/ast
+SEMANTIC_DIR = $(FRONTEND_DIR)/semantic
+SYMBOL_DIR = $(FRONTEND_DIR)/symbol
 TEST_DIR = ../tests/programs
 
 # Generated files
@@ -24,9 +44,7 @@ PARSER_CPP = $(PARSER_DIR)/parser.tab.cc
 PARSER_HH = $(PARSER_DIR)/parser.tab.hh
 PARSER_LOC = $(PARSER_DIR)/location.hh
 
-SEMANTIC_DIR = $(FRONTEND_DIR)/semantic
-SYMBOL_DIR = $(FRONTEND_DIR)/symbol
-
+# cpp source files
 SRCS := main.cpp \
         $(AST_DIR)/ast.cpp \
         $(AST_DIR)/ast_print.cpp \
@@ -37,16 +55,18 @@ SRCS := main.cpp \
         $(SYMBOL_DIR)/symbol_table.cpp \
         $(SYMBOL_DIR)/scope.cpp \
         $(SYMBOL_DIR)/sematype.cpp \
+		$(BACKEND_DIR)/codegen.cpp \
         $(PARSER_CPP) \
         $(LEXER_CPP)
+# object files
 OBJS := $(SRCS:.cpp=.o)
 
 # Default target
 all: $(TARGET)
 
-# Build main compiler executable
+# Link to LLVM and build main compiler executable
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LLVM_LDFLAGS) $(LLVM_RPATH)
 
 # Compile source files
 %.o: %.cpp $(PARSER_HH) $(LEXER_H)
