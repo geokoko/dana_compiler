@@ -31,6 +31,50 @@ namespace {
 		return a->equals(*b);
 	}
 
+	// Forward declaration for recursive compatibility checks
+	bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
+
+	// Checks compatibility of array types, allowing sized actuals for unsized parameters
+	bool arrayTypesCompatible(const ArrayType* actualArr, const ArrayType* expectedArr) {
+		if (!actualArr || !expectedArr) {
+			return false;
+		}
+
+		const auto expectedSize = expectedArr->size();
+		const auto actualSize = actualArr->size();
+
+		// If the parameter is sized, require an exact match from the caller
+		if (expectedSize) {
+			if (!actualSize || *actualSize != *expectedSize) {
+				return false;
+			}
+		}
+		// If the parameter is unsized, any actual size is acceptable
+		return typesCompatible(actualArr->elementType(), expectedArr->elementType());
+	}
+
+	// Checks whether an "actual" type can be used where "expected" is required
+	bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected) {
+		if (actual == expected) {
+			return true;
+		}
+		if (!actual || !expected) {
+			return false;
+		}
+
+		if (expected->getKind() == SemaType::TypeKind::ARRAY) {
+			if (actual->getKind() != SemaType::TypeKind::ARRAY) {
+				return false;
+			}
+			return arrayTypesCompatible(
+				static_cast<const ArrayType*>(actual.get()),
+				static_cast<const ArrayType*>(expected.get()));
+		}
+
+		// For non-array types, fall back to structural equality
+		return actual->equals(*expected);
+	}
+
 	/* Converts a semantic type to its string representation for diagnostics */
 	std::string typeToString(const SemaTypePtr& type) {
 		if (!type) {
@@ -232,7 +276,7 @@ namespace {
 				arg->sem(context);
 			}
 			auto actualType = arg ? arg->type() : SemaTypePtr{};
-			if (!typesEqual(actualType, params[i]->getType())) {
+			if (!typesCompatible(actualType, params[i]->getType())) {
 				context.diags().error(arg ? arg->loc : loc,
 					"in call to '" + callee + "', argument " + std::to_string(i + 1) +
 					" has type '" + typeToString(actualType) + "', expected '" +
