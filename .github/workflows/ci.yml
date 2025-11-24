@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flex bison build-essential g++ make
+
+      - name: Build project
+        run: |
+          make clean
+          make
+
+      - name: Check build artifacts
+        run: |
+          if [ ! -f dana_compiler ]; then
+          echo "Error: Compiler executable not found"
+          exit 1
+          fi
+          echo "Build successful!"
+
+  build-clang:
+    name: Build with Clang
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flex bison clang make
+
+      - name: Build with Clang
+        run: |
+          make clean
+          CXX=clang++ make
+
+  lint:
+    name: Code Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install linting tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format cppcheck
+
+      - name: Run clang-format check
+        run: |
+          echo "Checking code formatting..."
+          find . \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -not -path "./build/*" | xargs clang-format --dry-run --Werror || {
+          echo "Format check failed. Run 'clang-format -i' on the files above to fix."
+          exit 1
+          }
+
+      - name: Run cppcheck
+        run: |
+          echo "Running static analysis..."
+          cppcheck --enable=warning,style,performance,portability \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --error-exitcode=1 \
+          --inline-suppr \
+          . || {
+          echo "Static analysis found issues"
+          exit 1
+          }
