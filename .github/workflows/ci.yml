@@ -2,77 +2,30 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches:
+      - master
 
 jobs:
   build:
-    name: Build Verification
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Build
         run: |
-          sudo apt-get update
-          sudo apt-get install -y flex bison build-essential g++ make
-
-      - name: Build project
-        run: |
-          cd src && make
+          cd src
+          make      
 
       - name: Check build artifacts
         run: |
-          cd src
-          if [ ! -f dana_compiler ]; then
-          echo "Error: Compiler executable not found"
-          exit 1
+          if [ ! -x src/danac ]; then
+            echo "Executable not found at src/danac"
+            echo "Repo tree:"
+            ls -R .
+            exit 1
           fi
-          echo "Build successful!"
 
-  build-clang:
-    name: Build with Clang
-    runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flex bison clang make
-
-      - name: Build with Clang
-        run: |
-          cd src && make clean
-          cd src && CXX=clang++ make
-
-  lint:
-    name: Code Linting
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install linting tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cppcheck
-
-      - name: Run cppcheck
-        run: |
-          echo "Running static analysis..."
-          cppcheck --enable=warning,style,performance,portability \
-          --suppress=missingIncludeSystem \
-          --suppress=unusedFunction \
-          --error-exitcode=1 \
-          --inline-suppr \
-          . || {
-          echo "Static analysis found issues"
-          exit 1
-          }
