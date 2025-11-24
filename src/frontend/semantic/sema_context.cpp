@@ -1,5 +1,4 @@
 #include "sema_context.hpp"
-#include "../symbol/scope.hpp"
 
 SemContext::SemContext(SymbolTable& st, Diagnostics& d)
     : symtab_(st), diags_(d) {}
@@ -73,10 +72,6 @@ void SemContext::leaveFunction() {
 	if (!functionStack_.empty()) {
 		functionStack_.pop_back();
 	}
-}
-
-bool SemContext::insideFunction() const {
-	return !functionStack_.empty();
 }
 
 SemContext::FunctionFrame* SemContext::currentFunction() {
