@@ -47,8 +47,7 @@ LookupResult SemContext::lookupLocalSymbol(const std::string& name) const {
     return symtab_.current().lookupLocal(name);
 }
 
-InsertResult SemContext::declareSymbol(std::unique_ptr<Symbol> symbol,
-                                       bool reportDuplicates) {
+InsertResult SemContext::declareSymbol(std::unique_ptr<Symbol> symbol, bool reportDuplicates) {
     if (!symbol) {
         return {nullptr, false};
     }
