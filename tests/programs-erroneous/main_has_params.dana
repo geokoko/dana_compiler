@@ -1,0 +1,4 @@
+def main: y as int 
+	var x is int
+	x := 1
+	y := x

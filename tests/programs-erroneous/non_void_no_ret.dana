@@ -1,0 +1,6 @@
+def main
+	var k is int
+	def foo is int: x as int, y as int 
+		if x < 1: begin return: x end
+
+	k := foo (1, 2)
