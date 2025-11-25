@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "../common/source_location.hpp"
-#include "../symbol/scope.hpp"
 #include "../symbol/symbol.hpp"
 #include "../symbol/symbol_table.hpp"
 #include "diagnostics.hpp"
