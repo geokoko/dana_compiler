@@ -157,10 +157,10 @@ public:
 // Program root node
 class Program : public ASTNode {
 protected:
-    up<Def> top;
+    up<FuncDef> top;
 
 public:
-    Program(SourceLoc l, up<Def> d);
+    Program(SourceLoc l, up<FuncDef> d);
 	void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
     void agen(Codegen& v) override;

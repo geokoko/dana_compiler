@@ -58,7 +58,7 @@ void Block::agen(Codegen& v) { v.gen(*this); }
 
 Def::Def(SourceLoc l) : ASTNode(l) {}
 
-Program::Program(SourceLoc l, up<Def> d)
+Program::Program(SourceLoc l, up<FuncDef> d)
     : ASTNode(l), top(std::move(d)) {}
 void Program::agen(Codegen& v) { v.gen(*this); }
 
