@@ -11,300 +11,300 @@
 
 namespace {
 
-	/* Converts the frontend DataType enum to the corresponding semantic type */
-	SemaTypePtr scalarType(DataType dt) {
-		return dt == DataType::INT ? makeIntType() : makeByteType();
-	}
+/* Converts the frontend DataType enum to the corresponding semantic type */
+SemaTypePtr scalarType(DataType dt) {
+	return dt == DataType::INT ? makeIntType() : makeByteType();
+}
 
-	/* Compares two semantic types for equality */
-	bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
-		// same pointer or both null
-		if (a == b) {
-			return true;
-		}
-		if (!a || !b) {
-			return false;
-		}
-
-		// check type structure equality
-		return a->equals(*b);
-	}
-
-	// Forward declaration for recursive compatibility checks
-	bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
-
-	// Checks compatibility of array types, allowing sized actuals for unsized parameters
-	bool arrayTypesCompatible(const ArrayType* actualArr, const ArrayType* expectedArr) {
-		if (!actualArr || !expectedArr) {
-			return false;
-		}
-
-		const auto expectedSize = expectedArr->size();
-		const auto actualSize = actualArr->size();
-
-		// If the parameter is sized, require an exact match from the caller
-		if (expectedSize) {
-			if (!actualSize || *actualSize != *expectedSize) {
-				return false;
-			}
-		}
-		// If the parameter is unsized, any actual size is acceptable
-		return typesCompatible(actualArr->elementType(), expectedArr->elementType());
-	}
-
-	// Checks whether an "actual" type can be used where "expected" is required
-	bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected) {
-		if (actual == expected) {
-			return true;
-		}
-		if (!actual || !expected) {
-			return false;
-		}
-
-		if (expected->getKind() == SemaType::TypeKind::ARRAY) {
-			if (actual->getKind() != SemaType::TypeKind::ARRAY) {
-				return false;
-			}
-			return arrayTypesCompatible(
-				static_cast<const ArrayType*>(actual.get()),
-				static_cast<const ArrayType*>(expected.get()));
-		}
-
-		// For non-array types, fall back to structural equality
-		return actual->equals(*expected);
-	}
-
-	/* Converts a semantic type to its string representation for diagnostics */
-	std::string typeToString(const SemaTypePtr& type) {
-		if (!type) {
-			return "<invalid>";
-		}
-		switch (type->getKind()) {
-			case SemaType::TypeKind::INT:
-				return "int";
-			case SemaType::TypeKind::BYTE:
-				return "byte";
-			case SemaType::TypeKind::VOID:
-				return "void";
-			case SemaType::TypeKind::ARRAY: {
-				const auto* arr = static_cast<const ArrayType*>(type.get());
-				std::ostringstream oss;
-				oss << typeToString(arr->elementType()) << '[';
-				if (arr->size()) {
-					oss << *arr->size();
-				}
-				oss << ']';
-				return oss.str();
-			}
-			case SemaType::TypeKind::FUNC:
-				return "fn";
-		}
-		return "<unknown>";
-	}
-
-	/* Checks if a semantic type is of a specific kind */
-	bool isIntType(const SemaTypePtr& t) {
-		return t && t->getKind() == SemaType::TypeKind::INT;
-	}
-
-	bool isByteType(const SemaTypePtr& t) {
-		return t && t->getKind() == SemaType::TypeKind::BYTE;
-	}
-
-	bool isArrayType(const SemaTypePtr& t) {
-		return t && t->getKind() == SemaType::TypeKind::ARRAY;
-	}
-
-	const ArrayType* asArray(const SemaTypePtr& t) {
-		return isArrayType(t) ? static_cast<const ArrayType*>(t.get()) : nullptr;
-	}
-
-	SemaTypePtr elementTypeOf(const SemaTypePtr& t) {
-		if (auto* arr = asArray(t)) {
-			return arr->elementType();
-		}
-		return nullptr;
-	}
-
-	/* Validates an array dimension */
-	bool validateDimension(const std::optional<int>& dim, bool allowUnsized, const SourceLoc& loc, SemContext& context) {
-		if (!dim.has_value()) {
-			if (allowUnsized) {
-				return true;
-			}
-			context.diags().error(loc, "array dimension must be specified");
-			return false;
-		}
-		if (*dim <= 0) {
-			context.diags().error(loc, "array dimension must be greater than zero");
-			return false;
-		}
+/* Compares two semantic types for equality */
+bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
+	// same pointer or both null
+	if (a == b) {
 		return true;
 	}
+	if (!a || !b) {
+		return false;
+	}
 
-	/* Builds any semantic type from a AST captured info into an array type (or a base type, if no dims are present) */
-	/* If allowUnsizedFirst is true, the first dimension can be unsized (for parameters) */
-	SemaTypePtr buildArrayType(const SourceLoc& loc, SemaTypePtr base, const vec<std::optional<int>>& dims, 
-							bool allowUnsizedFirst, SemContext& context) 
-	{
-		SemaTypePtr result = std::move(base); // first move the scalar type to result
-		for (std::size_t i = dims.size(); i-- > 0;) {
-			const bool allowUnsized = allowUnsizedFirst && i == 0;
-			if (!validateDimension(dims[i], allowUnsized, loc, context)) {
-				return nullptr;
-			}
-			std::optional<std::size_t> extent;
-			if (dims[i]) {
-				extent = static_cast<std::size_t>(*dims[i]);
-			}
-			result = makeArrayType(result, extent); // if we have dims, wrap the current result into an array type
+	// check type structure equality
+	return a->equals(*b);
+}
+
+// Forward declaration for recursive compatibility checks
+bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
+
+// Checks compatibility of array types, allowing sized actuals for unsized parameters
+bool arrayTypesCompatible(const ArrayType* actualArr, const ArrayType* expectedArr) {
+	if (!actualArr || !expectedArr) {
+		return false;
+	}
+
+	const auto expectedSize = expectedArr->size();
+	const auto actualSize = actualArr->size();
+
+	// If the parameter is sized, require an exact match from the caller
+	if (expectedSize) {
+		if (!actualSize || *actualSize != *expectedSize) {
+			return false;
 		}
-		/* Returns:
+	}
+	// If the parameter is unsized, any actual size is acceptable
+	return typesCompatible(actualArr->elementType(), expectedArr->elementType());
+}
+
+// Checks whether an "actual" type can be used where "expected" is required
+bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected) {
+	if (actual == expected) {
+		return true;
+	}
+	if (!actual || !expected) {
+		return false;
+	}
+
+	if (expected->getKind() == SemaType::TypeKind::ARRAY) {
+		if (actual->getKind() != SemaType::TypeKind::ARRAY) {
+			return false;
+		}
+		return arrayTypesCompatible(
+			static_cast<const ArrayType*>(actual.get()),
+			static_cast<const ArrayType*>(expected.get()));
+	}
+
+	// For non-array types, fall back to structural equality
+	return actual->equals(*expected);
+}
+
+/* Converts a semantic type to its string representation for diagnostics */
+std::string typeToString(const SemaTypePtr& type) {
+	if (!type) {
+		return "<invalid>";
+	}
+	switch (type->getKind()) {
+		case SemaType::TypeKind::INT:
+			return "int";
+		case SemaType::TypeKind::BYTE:
+			return "byte";
+		case SemaType::TypeKind::VOID:
+			return "void";
+		case SemaType::TypeKind::ARRAY: {
+			const auto* arr = static_cast<const ArrayType*>(type.get());
+			std::ostringstream oss;
+			oss << typeToString(arr->elementType()) << '[';
+			if (arr->size()) {
+				oss << *arr->size();
+			}
+			oss << ']';
+			return oss.str();
+		}
+		case SemaType::TypeKind::FUNC:
+			return "fn";
+	}
+	return "<unknown>";
+}
+
+/* Checks if a semantic type is of a specific kind */
+bool isIntType(const SemaTypePtr& t) {
+	return t && t->getKind() == SemaType::TypeKind::INT;
+}
+
+bool isByteType(const SemaTypePtr& t) {
+	return t && t->getKind() == SemaType::TypeKind::BYTE;
+}
+
+bool isArrayType(const SemaTypePtr& t) {
+	return t && t->getKind() == SemaType::TypeKind::ARRAY;
+}
+
+const ArrayType* asArray(const SemaTypePtr& t) {
+	return isArrayType(t) ? static_cast<const ArrayType*>(t.get()) : nullptr;
+}
+
+SemaTypePtr elementTypeOf(const SemaTypePtr& t) {
+	if (auto* arr = asArray(t)) {
+		return arr->elementType();
+	}
+	return nullptr;
+}
+
+/* Validates an array dimension */
+bool validateDimension(const std::optional<int>& dim, bool allowUnsized, const SourceLoc& loc, SemContext& context) {
+	if (!dim.has_value()) {
+		if (allowUnsized) {
+			return true;
+		}
+		context.diags().error(loc, "array dimension must be specified");
+		return false;
+	}
+	if (*dim <= 0) {
+		context.diags().error(loc, "array dimension must be greater than zero");
+		return false;
+	}
+	return true;
+}
+
+/* Builds any semantic type from a AST captured info into an array type (or a base type, if no dims are present) */
+/* If allowUnsizedFirst is true, the first dimension can be unsized (for parameters) */
+SemaTypePtr buildArrayType(const SourceLoc& loc, SemaTypePtr base, const vec<std::optional<int>>& dims, 
+						   bool allowUnsizedFirst, SemContext& context) 
+{
+	SemaTypePtr result = std::move(base); // first move the scalar type to result
+	for (std::size_t i = dims.size(); i-- > 0;) {
+		const bool allowUnsized = allowUnsizedFirst && i == 0;
+		if (!validateDimension(dims[i], allowUnsized, loc, context)) {
+			return nullptr;
+		}
+		std::optional<std::size_t> extent;
+		if (dims[i]) {
+			extent = static_cast<std::size_t>(*dims[i]);
+		}
+		result = makeArrayType(result, extent); // if we have dims, wrap the current result into an array type
+	}
+	/* Returns:
 		 * - base type if no dimensions
 		 * - array type(s) if dimensions are present
 		 */
-		return result;
-	}
+	return result;
+}
 
-	/* Resolves a type node into a semantic base type (int or byte) */
-	SemaTypePtr resolveType(const Type& node, SemContext& context, bool allowUnsizedFirst = false) {
-		auto base = scalarType(node.data_type());
-		return buildArrayType(node.loc, base, node.dimensions(), allowUnsizedFirst, context);
-	}
+/* Resolves a type node into a semantic base type (int or byte) */
+SemaTypePtr resolveType(const Type& node, SemContext& context, bool allowUnsizedFirst = false) {
+	auto base = scalarType(node.data_type());
+	return buildArrayType(node.loc, base, node.dimensions(), allowUnsizedFirst, context);
+}
 
-	/* Resolves a function/procedure parameter type, determining its pass mode */
-	SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemContext& context) {
-		const bool isArray = !node.dimensions().empty();
-		auto resolved = resolveType(node, context, true);
-		if (!resolved) {
-			return nullptr;
-		}
-		if (isArray) {
-			pass = Symbol::ParamPass::BY_REF;
-		} else {
-			pass = node.isByRef() ? Symbol::ParamPass::BY_REF : Symbol::ParamPass::BY_VAL;
-		}
-		return resolved;
+/* Resolves a function/procedure parameter type, determining its pass mode */
+SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemContext& context) {
+	const bool isArray = !node.dimensions().empty();
+	auto resolved = resolveType(node, context, true);
+	if (!resolved) {
+		return nullptr;
 	}
-
-	SemaTypePtr buildFunctionSignature(const SemContext::HeaderInfo& info) {
-		std::vector<SemaTypePtr> paramTypes;
-		paramTypes.reserve(info.params.size());
-		for (const auto& param : info.params) {
-			paramTypes.push_back(param.type);
-		}
-		return makeFuncType(info.returnType, std::move(paramTypes));
+	if (isArray) {
+		pass = Symbol::ParamPass::BY_REF;
+	} else {
+		pass = node.isByRef() ? Symbol::ParamPass::BY_REF : Symbol::ParamPass::BY_VAL;
 	}
+	return resolved;
+}
 
-	/* Sets function/procedure parameters from header info into the given symbol */
-	void setSymbolParamsFromHeader(Symbol* symbol, const SemContext::HeaderInfo& info) {
-		if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
-			return;
-		}
-		auto* func = static_cast<FuncSymbol*>(symbol);
-		func->clearParams();
-		for (const auto& param : info.params) {
-			func->addParam(std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc));
-		}
+SemaTypePtr buildFunctionSignature(const SemContext::HeaderInfo& info) {
+	std::vector<SemaTypePtr> paramTypes;
+	paramTypes.reserve(info.params.size());
+	for (const auto& param : info.params) {
+		paramTypes.push_back(param.type);
 	}
+	return makeFuncType(info.returnType, std::move(paramTypes));
+}
 
-	/* Checks if a function/procedure signature matches the provided header info */
-	bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
-		if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
+/* Sets function/procedure parameters from header info into the given symbol */
+void setSymbolParamsFromHeader(Symbol* symbol, const SemContext::HeaderInfo& info) {
+	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
+		return;
+	}
+	auto* func = static_cast<FuncSymbol*>(symbol);
+	func->clearParams();
+	for (const auto& param : info.params) {
+		func->addParam(std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc));
+	}
+}
+
+/* Checks if a function/procedure signature matches the provided header info */
+bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
+	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
+		return false;
+	}
+	const auto* func = static_cast<const FuncSymbol*>(symbol);
+	if (func->isProcedure() != info.isProcedure) {
+		return false;
+	}
+	auto expectedSig = buildFunctionSignature(info);
+	if (!typesEqual(expectedSig, func->getType())) {
+		return false;
+	}
+	const auto& params = func->getParams();
+	if (params.size() != info.params.size()) {
+		return false;
+	}
+	for (std::size_t i = 0; i < params.size(); ++i) {
+		if (!typesEqual(params[i]->getType(), info.params[i].type)) {
 			return false;
 		}
-		const auto* func = static_cast<const FuncSymbol*>(symbol);
-		if (func->isProcedure() != info.isProcedure) {
+		if (params[i]->getPass() != info.params[i].passMode) {
 			return false;
 		}
-		auto expectedSig = buildFunctionSignature(info);
-		if (!typesEqual(expectedSig, func->getType())) {
-			return false;
-		}
-		const auto& params = func->getParams();
-		if (params.size() != info.params.size()) {
-			return false;
-		}
-		for (std::size_t i = 0; i < params.size(); ++i) {
-			if (!typesEqual(params[i]->getType(), info.params[i].type)) {
-				return false;
-			}
-			if (params[i]->getPass() != info.params[i].passMode) {
-				return false;
-			}
-		}
+	}
+	return true;
+}
+
+/* Declares function/procedure parameters in the current scope */
+void declareParamsInScope(const SemContext::HeaderInfo& info, SemContext& context) {
+	for (const auto& param : info.params) {
+		auto sym = std::make_unique<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
+		context.declareSymbol(std::move(sym));
+	}
+}
+
+/* Ensures that a loop label is not already in use */
+bool ensureLoopLabelAvailable(SemContext& context, const std::optional<std::string>& label, const SourceLoc& loc) {
+	if (!label) {
 		return true;
 	}
-
-	/* Declares function/procedure parameters in the current scope */
-	void declareParamsInScope(const SemContext::HeaderInfo& info, SemContext& context) {
-		for (const auto& param : info.params) {
-			auto sym = std::make_unique<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
-			context.declareSymbol(std::move(sym));
-		}
+	if (context.hasLoopLabel(*label)) {
+		context.diags().error(loc, "loop label '" + *label + "' already in use");
+		return false;
 	}
+	return true;
+}
 
-	/* Ensures that a loop label is not already in use */
-	bool ensureLoopLabelAvailable(SemContext& context, const std::optional<std::string>& label, const SourceLoc& loc) {
-		if (!label) {
-			return true;
-		}
-		if (context.hasLoopLabel(*label)) {
-			context.diags().error(loc, "loop label '" + *label + "' already in use");
-			return false;
-		}
-		return true;
+/* Checks function/procedure call arguments against parameters */
+bool checkArguments(vec<up<Expr>>& args,
+					const std::vector<std::shared_ptr<ParamSymbol>>& params,
+					SemContext& context,
+					const std::string& callee,
+					const SourceLoc& loc) {
+	if (args.size() != params.size()) {
+		context.diags().error(loc,
+						"call to '" + callee + "' expects " + std::to_string(params.size()) +
+						" argument(s) but got " + std::to_string(args.size()));
 	}
-
-	/* Checks function/procedure call arguments against parameters */
-	bool checkArguments(vec<up<Expr>>& args,
-						const std::vector<std::shared_ptr<ParamSymbol>>& params,
-						SemContext& context,
-						const std::string& callee,
-						const SourceLoc& loc) {
-		if (args.size() != params.size()) {
-			context.diags().error(loc,
-				"call to '" + callee + "' expects " + std::to_string(params.size()) +
-				" argument(s) but got " + std::to_string(args.size()));
+	std::size_t count = std::min(args.size(), params.size());
+	bool ok = args.size() == params.size();
+	for (std::size_t i = 0; i < count; ++i) {
+		auto& arg = args[i];
+		if (arg) {
+			arg->sem(context);
 		}
-		std::size_t count = std::min(args.size(), params.size());
-		bool ok = args.size() == params.size();
-		for (std::size_t i = 0; i < count; ++i) {
-			auto& arg = args[i];
-			if (arg) {
-				arg->sem(context);
-			}
-			auto actualType = arg ? arg->type() : SemaTypePtr{};
-			if (!typesCompatible(actualType, params[i]->getType())) {
+		auto actualType = arg ? arg->type() : SemaTypePtr{};
+		if (!typesCompatible(actualType, params[i]->getType())) {
+			context.diags().error(arg ? arg->loc : loc,
+						 "in call to '" + callee + "', argument " + std::to_string(i + 1) +
+						 " has type '" + typeToString(actualType) + "', expected '" +
+						 typeToString(params[i]->getType()) + "'");
+			ok = false;
+		}
+		if (params[i]->getPass() == Symbol::ParamPass::BY_REF) {
+			if (!arg || !arg->isLValue()) {
 				context.diags().error(arg ? arg->loc : loc,
-					"in call to '" + callee + "', argument " + std::to_string(i + 1) +
-					" has type '" + typeToString(actualType) + "', expected '" +
-					typeToString(params[i]->getType()) + "'");
+						  "in call to '" + callee + "', argument " + std::to_string(i + 1) +
+						  " must be an l-value for by-ref parameter");
 				ok = false;
 			}
-			if (params[i]->getPass() == Symbol::ParamPass::BY_REF) {
-				if (!arg || !arg->isLValue()) {
-					context.diags().error(arg ? arg->loc : loc,
-						"in call to '" + callee + "', argument " + std::to_string(i + 1) +
-						" must be an l-value for by-ref parameter");
-					ok = false;
-				}
-			}
 		}
-		for (std::size_t i = count; i < args.size(); ++i) {
-			if (args[i]) {
-				args[i]->sem(context);
-			}
-		}
-		return ok;
 	}
+	for (std::size_t i = count; i < args.size(); ++i) {
+		if (args[i]) {
+			args[i]->sem(context);
+		}
+	}
+	return ok;
+}
 
-	std::unique_ptr<Symbol> makeFunctionSymbol(const SemContext::HeaderInfo& info) {
-		auto sig = buildFunctionSignature(info);
-		auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
-		setSymbolParamsFromHeader(func.get(), info);
-		return func;
-	}
+std::unique_ptr<Symbol> makeFunctionSymbol(const SemContext::HeaderInfo& info) {
+	auto sig = buildFunctionSignature(info);
+	auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
+	setSymbolParamsFromHeader(func.get(), info);
+	return func;
+}
 
 } // helper namespace 
 
@@ -362,7 +362,7 @@ void Header::sem(SemContext& context) {
 		for (const auto& id : param->names()) {
 			if (!seen.insert(id).second) {
 				context.diags().error(param->loc,
-					"duplicate parameter name '" + id + "' in header '" + name + "'");
+						  "duplicate parameter name '" + id + "' in header '" + name + "'");
 				continue;
 			}
 
@@ -400,8 +400,7 @@ void FuncDecl::sem(SemContext& context) {
 	Symbol* symbol = existing.symbol;
 	if (symbol) {
 		if (!signaturesMatch(*info, symbol)) {
-			context.diags().error(loc,
-				"forward declaration of '" + info->name + "' conflicts with previous declaration");
+			context.diags().error(loc, "forward declaration of '" + info->name + "' conflicts with previous declaration");
 			return;
 		}
 		if (symbol->isDefined()) {
@@ -430,8 +429,7 @@ void FuncDef::sem(SemContext& context) {
 	Symbol* symbol = existing.symbol;
 	if (symbol) {
 		if (!signaturesMatch(*info, symbol)) {
-			context.diags().error(loc,
-				"definition of '" + info->name + "' does not match prior declaration");
+			context.diags().error(loc, "definition of '" + info->name + "' does not match prior declaration");
 			return;
 		}
 		if (symbol->isDefined()) {
@@ -514,9 +512,8 @@ void AssignStmt::sem(SemContext& context) {
 		return;
 	}
 	if (!typesEqual(leftType, rightType)) {
-		context.diags().error(loc,
-			"assignment type mismatch: left is '" + typeToString(leftType) +
-			"', right is '" + typeToString(rightType) + "'");
+		context.diags().error(loc, "assignment type mismatch: left is '" + typeToString(leftType) + 
+						"', right is '" + typeToString(rightType) + "'");
 	}
 }
 
@@ -573,8 +570,8 @@ void ReturnStmt::sem(SemContext& context) {
 	}
 	if (!typesEqual(frame->returnType, value->type())) {
 		context.diags().error(loc,
-			"return type mismatch: expected '" + typeToString(frame->returnType) +
-			"' but got '" + typeToString(value->type()) + "'");
+						"return type mismatch: expected '" + typeToString(frame->returnType) +
+						"' but got '" + typeToString(value->type()) + "'");
 	}
 	frame->sawReturn = true;
 }
@@ -587,8 +584,10 @@ void ProcCall::sem(SemContext& context) {
 		: nullptr;
 	if (!funcSym || !funcSym->isProcedure()) {
 		context.diags().error(loc, "unknown procedure '" + name + "'");
+		setSymbol(nullptr);
 		return;
 	}
+	setSymbol(funcSym);
 	const auto& params = funcSym->getParams();
 	checkArguments(args, params, context, name, loc);
 }
@@ -620,8 +619,10 @@ void IdLVal::sem(SemContext& context) {
 		context.diags().error(loc, "unknown variable '" + name + "'");
 		setType(nullptr);
 		setAssignable(false);
+		setSymbol(nullptr);
 		return;
 	}
+	setSymbol(symbol);
 	setType(symbol->getType());
 	setAssignable(true);
 }
@@ -704,9 +705,11 @@ void FuncCall::sem(SemContext& context) {
 		: nullptr;
 	if (!funcSym || funcSym->isProcedure()) {
 		context.diags().error(loc, "unknown function '" + name + "'");
+		setSymbol(nullptr);
 		setType(nullptr);
 		return;
 	}
+	setSymbol(funcSym);
 	const auto& params = funcSym->getParams();
 	checkArguments(args, params, context, name, loc);
 	const auto* sig = static_cast<const FuncType*>(funcSym->getType().get());
@@ -755,7 +758,7 @@ void BinaryExpr::sem(SemContext& context) {
 		case BinOp::Div:
 		case BinOp::Mod:
 			if (!typesEqual(leftType, rightType) ||
-			    !(isIntType(leftType) || isByteType(leftType))) {
+				!(isIntType(leftType) || isByteType(leftType))) {
 				context.diags().error(loc, "arithmetic operands must both be int or byte");
 			}
 			setType(leftType);

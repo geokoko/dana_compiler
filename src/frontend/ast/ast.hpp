@@ -20,6 +20,7 @@ template <class T> using vec = std::vector<T>;
 
 class SemContext;
 class Codegen;
+class Symbol;
 
 // Base AST Node class
 class ASTNode {
@@ -154,6 +155,7 @@ public:
     void print(std::ostream& out) const override;
 };
 
+class FuncDef; // forward declaration
 // Program root node
 class Program : public ASTNode {
 protected:
@@ -283,9 +285,12 @@ class ProcCall : public Stmt {
 protected:
     string name;
     vec<up<Expr>> args;
+    Symbol* symbol_ = nullptr;
 
 public:
     ProcCall(SourceLoc l, string id, vec<up<Expr>> a);
+    Symbol* symbol() const { return symbol_; }
+    void setSymbol(Symbol* sym) { symbol_ = sym; }
     void print(std::ostream& out) const override;
 	void sem(SemContext& context) override;
     void agen(Codegen& v) override;
@@ -349,9 +354,12 @@ public:
 class IdLVal : public Lval {
 private:
     string name;
+    Symbol* symbol_ = nullptr;
 
 public:
     IdLVal(SourceLoc l, string id);
+    Symbol* symbol() const { return symbol_; }
+    void setSymbol(Symbol* sym) { symbol_ = sym; }
     void print(std::ostream& out) const override;
 	void sem(SemContext& context) override;
     void agen(Codegen& v) override;
@@ -448,9 +456,12 @@ class FuncCall : public Expr {
 protected:
     string name;
     vec<up<Expr>> args;
+    Symbol* symbol_ = nullptr;
 
 public:
     FuncCall(SourceLoc l, string id, vec<up<Expr>> a);
+    Symbol* symbol() const { return symbol_; }
+    void setSymbol(Symbol* sym) { symbol_ = sym; }
     void sem(SemContext& context) override;
     void print(std::ostream& out) const override;
     void agen(Codegen& v) override;
