@@ -21,6 +21,8 @@ template <class T> using vec = std::vector<T>;
 class SemContext;
 class Codegen;
 class Symbol;
+class FuncSymbol;
+class VarSymbol;
 
 // Base AST Node class
 class ASTNode {
@@ -155,7 +157,7 @@ public:
     void print(std::ostream& out) const override;
 };
 
-class FuncDef; // forward declaration
+class FuncDef; 
 // Program root node
 class Program : public ASTNode {
 protected:
@@ -189,6 +191,8 @@ protected:
     string name;
     optional<DataType> return_type;
     vec<up<FParDef>> params;
+	// function symbol initialized with header
+    FuncSymbol* symbol_ = nullptr;
 
 public:
     Header(SourceLoc l, string n, optional<DataType> r, vec<up<FParDef>> p);
@@ -197,6 +201,8 @@ public:
 	const string& identifier() const;
 	const vec<up<FParDef>>& parameters() const;
 	optional<DataType> returnType() const;
+    FuncSymbol* symbol() const { return symbol_; }
+    void setSymbol(FuncSymbol* sym) { symbol_ = sym; }
     void print(std::ostream& out) const override;
     void agen(Codegen& v) override;
 };
@@ -205,11 +211,13 @@ class VarDef : public Def {
 private:
     vec<string> names;
     up<Type> declared_type;
+    vec<VarSymbol*> symbols_;
 
 public:
     VarDef(SourceLoc l, vec<string> ids, up<Type> t);
 
     void sem(SemContext& context) override;
+    const vec<VarSymbol*>& symbols() const { return symbols_; }
     void print(std::ostream& out) const override;
     void agen(Codegen& v) override;
 };
@@ -285,6 +293,7 @@ class ProcCall : public Stmt {
 protected:
     string name;
     vec<up<Expr>> args;
+	// store associated symbol (callee)
     Symbol* symbol_ = nullptr;
 
 public:
@@ -354,6 +363,7 @@ public:
 class IdLVal : public Lval {
 private:
     string name;
+	// store associated symbol
     Symbol* symbol_ = nullptr;
 
 public:
@@ -456,6 +466,7 @@ class FuncCall : public Expr {
 protected:
     string name;
     vec<up<Expr>> args;
+	// store associated symbol (callee)
     Symbol* symbol_ = nullptr;
 
 public:
