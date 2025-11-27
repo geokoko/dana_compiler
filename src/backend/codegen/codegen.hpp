@@ -135,12 +135,16 @@ public:
     void gen(BinaryCond& n) override;
     void gen(RelCond& n) override;
 
-    // Expression result
+    // Expression result is stored here. For voids, set to nullptr.
     llvm::Value* value = nullptr;
 
 private:
     CodegenContext& genCtx;
 
+	// Generate address of an lvalue
+	llvm::Value* genAddress(LVal& lv);
+
     // helpers
     llvm::Value* genExpr(Expr& e);
 };
+

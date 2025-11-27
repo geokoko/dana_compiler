@@ -17,7 +17,7 @@
 #include "../../frontend/symbol/symbol.hpp"
 #include "../../frontend/symbol/sematype.hpp"
 
-/* Codegen context holds all LLVM state needed while generating IR for a Dana Program */
+/* CodegenContext holds all LLVM state needed while generating IR for a Dana Program */
 
 class CodegenContext {
 public:
