@@ -367,10 +367,11 @@ public:
 };
 
 class LoopStmt : public Stmt {
-public:
-    optional<string> label;
+private:
+	optional<string> label;
     up<Block> body;
 
+public:
     LoopStmt(SourceLoc l, std::optional<string> lbl, up<Block> blk);
     void print(std::ostream& out) const override;
 	void sem(SemContext& context) override;
