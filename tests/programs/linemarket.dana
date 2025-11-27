@@ -17,7 +17,7 @@ def main
     var stores size s f N tail is int
     var MAX_STORES MAX_PLACES is int
     var i is int
-    var arr is int[200000]
+    var arr is int[32767]
 
     def swap: x y as ref int
         var t is int
@@ -39,13 +39,13 @@ def main
                         changed := true
                     i_bsort := i_bsort + 1
                 else: break
-            if not changed: break
+            if changed = false: break
 
     def possible_store is byte: current_arr as int[], mid spaces stores_to_place as int
         var last_position placed_stores i_ps is int
         var j is int
         var position is int
-        last_position := -1000000000
+        last_position := -32768
         placed_stores := 0
         i_ps := 0
         loop:
@@ -83,7 +83,7 @@ def main
 
                 if distance <= 0 : distance := 1
 
-                if possible_store(lmd_arr, distance, spaces, num_stores):
+                if possible_store(lmd_arr, distance, spaces, num_stores) = true:
                     result := distance
                     left := distance + 1
                 else:
@@ -91,8 +91,8 @@ def main
         return: result
 
     tail := 0
-    MAX_STORES := 1000000
-    MAX_PLACES := 100000
+    MAX_STORES := 32767
+    MAX_PLACES := 32767
 
     stores := readInteger()
     N := readInteger()

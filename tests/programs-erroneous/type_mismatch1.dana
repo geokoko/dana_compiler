@@ -1,27 +1,29 @@
+(* This is the bsort.dana program with a type error *)
+
 def main
-  def swap: x y as ref int
-    var t is int
-    t := x
-    x := y
-    y := t
 
   def bsort: n as int, x as int []
+
+    def swap: x y as ref int
+      var t is int
+      t := x
+      x := y
+      y := t
+
     var changed is byte
     var i is int
 
-    loop outer_loop_label:
+    loop:
       changed := false
       i := 0
-      loop inner_loop_label:
+      loop:
         if i < n-1:
           if x[i] > x[i+1]:
             swap: x[i], x[i+1]
             changed := true
           i := i+1
-        else:
-          break : inner_loop_label
-      if not (changed = true) :
-        break : outer_loop_label
+        else: break
+        if not changed: break
 
   def writeArray: msg as byte [], n as int, x as int []
     var i is int
@@ -37,17 +39,16 @@ def main
     writeString: "\n"
 
   var seed i is int
-  var x is int [16]
+  var x      is int [16]
 
   seed := 65
   i := 0
-  loop init_loop:
+  loop:
     if i < 16:
       seed := (seed * 137 + 221 + i) % 101
       x[i] := seed
       i := i+1
-    else:
-      break : init_loop
+    else: break
   writeArray: "Initial array: ", 16, x
-  bsort: 16, x
+  bsort: 16, x[0]	# ERROR: Type mismatch
   writeArray: "Sorted  array: ", 16, x
