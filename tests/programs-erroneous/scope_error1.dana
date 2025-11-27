@@ -1,0 +1,11 @@
+# Error: x is declared in the loop but called outside the loop
+
+def main
+	var i is int
+	i := 10
+	loop:
+		var x is byte
+		x := 'A'
+		i := i - 1
+		if i=0	: break
+	x := 42
