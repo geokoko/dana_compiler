@@ -36,6 +36,7 @@ class BreakStmt;
 class ContinueStmt;
 class IfStmt;
 class LoopStmt;
+class Lval;
 class IdLVal;
 class StringLiteralLVal;
 class IndexLVal;
@@ -142,9 +143,8 @@ private:
     CodegenContext& genCtx;
 
 	// Generate address of an lvalue
-	llvm::Value* genAddress(LVal& lv);
+	llvm::Value* genAddress(Lval& lv);
 
     // helpers
     llvm::Value* genExpr(Expr& e);
 };
-
