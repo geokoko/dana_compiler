@@ -187,7 +187,8 @@ SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemC
 	return resolved;
 }
 
-SemaTypePtr buildFunctionSignature(const SemContext::HeaderInfo& info) {
+/* Builds a function signature's Type */
+SemaTypePtr buildFuncType(const SemContext::HeaderInfo& info) {
 	std::vector<SemaTypePtr> paramTypes;
 	paramTypes.reserve(info.params.size());
 	for (const auto& param : info.params) {
@@ -217,7 +218,7 @@ bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
 	if (func->isProcedure() != info.isProcedure) {
 		return false;
 	}
-	auto expectedSig = buildFunctionSignature(info);
+	auto expectedSig = buildFuncType(info);
 	if (!typesEqual(expectedSig, func->getType())) {
 		return false;
 	}
@@ -300,7 +301,7 @@ bool checkArguments(vec<up<Expr>>& args,
 }
 
 std::unique_ptr<Symbol> makeFunctionSymbol(const SemContext::HeaderInfo& info) {
-	auto sig = buildFunctionSignature(info);
+	auto sig = buildFuncType(info);
 	auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
 	setSymbolParamsFromHeader(func.get(), info);
 	return func;
@@ -315,6 +316,7 @@ void Program::sem(SemContext& context) {
 	if (context.scopeDepth() == 1) {
 		context.openScope();
 	}
+
 	if (top) {
 		top->sem(context);
 	}
@@ -361,8 +363,7 @@ void Header::sem(SemContext& context) {
 
 		for (const auto& id : param->names()) {
 			if (!seen.insert(id).second) {
-				context.diags().error(param->loc,
-						  "duplicate parameter name '" + id + "' in header '" + name + "'");
+				context.diags().error(param->loc, "duplicate parameter name '" + id + "' in header '" + name + "'");
 				continue;
 			}
 
@@ -379,13 +380,16 @@ void Header::sem(SemContext& context) {
 }
 
 void VarDef::sem(SemContext& context) {
+	symbols_.clear();
 	auto resolved = resolveType(*declared_type, context);
 	if (!resolved) {
 		return;
 	}
 	for (const auto& id : names) {
 		auto sym = std::make_unique<VarSymbol>(id, resolved, loc);
+		VarSymbol* raw = sym.get();
 		context.declareSymbol(std::move(sym));
+		symbols_.push_back(raw);
 	}
 }
 
@@ -409,6 +413,7 @@ void FuncDecl::sem(SemContext& context) {
 		}
 		setSymbolParamsFromHeader(symbol, *info);
 		symbol->markForwardDeclaration();
+		header->setSymbol(static_cast<FuncSymbol*>(symbol));
 		return;
 	}
 
@@ -416,6 +421,7 @@ void FuncDecl::sem(SemContext& context) {
 	Symbol* raw = sym.get();
 	context.declareSymbol(std::move(sym));
 	raw->markForwardDeclaration();
+	header->setSymbol(static_cast<FuncSymbol*>(raw));
 }
 
 void FuncDef::sem(SemContext& context) {
@@ -441,6 +447,8 @@ void FuncDef::sem(SemContext& context) {
 		symbol = sym.get();
 		context.declareSymbol(std::move(sym));
 	}
+
+	header->setSymbol(static_cast<FuncSymbol*>(symbol));
 
 	context.openScope();
 	// create a function frame and store inside SemContext driver
