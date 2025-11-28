@@ -1,10 +1,5 @@
 #pragma once
 
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -14,46 +9,8 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-#include "../../frontend/symbol/symbol.hpp"
-#include "../../frontend/symbol/sematype.hpp"
+#include "../../frontend/ast/ast.hpp"
 #include "codegen_context.hpp"
-
-// Forward declarations of AST nodes
-class Program;
-class FuncDef;
-class FuncDecl;
-class Header;
-class VarDef;
-class FParDef;
-class Block;
-class Expr;
-class SkipStmt;
-class ExitStmt;
-class AssignStmt;
-class ReturnStmt;
-class ProcCall;
-class BreakStmt;
-class ContinueStmt;
-class IfStmt;
-class LoopStmt;
-class Lval;
-class IdLVal;
-class StringLiteralLVal;
-class IndexLVal;
-class IntConst;
-class CharConst;
-class TrueConst;
-class FalseConst;
-class LValueExpr;
-class ParenExpr;
-class FuncCall;
-class UnaryExpr;
-class BinaryExpr;
-class ExprCond;
-class ParenCond;
-class NotCond;
-class BinaryCond;
-class RelCond;
 
 // Codegen visitor interface 
 class Codegen {
@@ -136,7 +93,7 @@ public:
     void gen(BinaryCond& n) override;
     void gen(RelCond& n) override;
 
-    // Expression result is stored here. For voids, set to nullptr.
+    // Result of the most recently evaluated expression is stored here. For voids, set to nullptr.
     llvm::Value* value = nullptr;
 
 private:
