@@ -40,10 +40,6 @@ void Symbol::markDefined() {
 	isDefined_ = true;
 }
 
-bool Symbol::isForwardDeclaration() const {
-	return isForward_;
-}
-
 bool Symbol::isDefined() const {
 	return isDefined_;
 }

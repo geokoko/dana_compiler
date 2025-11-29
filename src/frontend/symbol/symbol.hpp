@@ -30,7 +30,6 @@ public:
 
 	void markForwardDeclaration();
 	void markDefined();
-	bool isForwardDeclaration() const;
 	bool isDefined() const;
 
 protected:
