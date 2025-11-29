@@ -1,6 +1,9 @@
 #include "codegen.hpp"
-#include "../../frontend/ast/ast.hpp"
 
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 void LLVMCodegen::gen(Program& n) {
 	if (auto* def = n.definition()) {
 		def->agen(*this);
@@ -87,7 +90,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 }
 
 void LLVMCodegen::gen(Block& n) {
-	for (auto& stmt : statementsList()) {
+	for (auto& stmt : n.statementsList()) {
 		stmt->agen(*this);
 	}
 }
@@ -97,7 +100,8 @@ void LLVMCodegen::gen(SkipStmt& n) {
 }
 
 void LLVMCodegen::gen(ExitStmt& n) {
-	(void)n;
+	// Exit from a procedure: emit a void return
+	genCtx.builder().CreateRetVoid();
 }
 
 void LLVMCodegen::gen(AssignStmt& n) {
