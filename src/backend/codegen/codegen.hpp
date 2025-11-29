@@ -104,4 +104,6 @@ private:
 
     // helpers
     llvm::Value* genExpr(Expr& e);
+	llvm::Value* getVarAddress(const Symbol* sym);
+	llvm::Value* makeStaticLinkArg(const FuncSymbol* callee);
 };
