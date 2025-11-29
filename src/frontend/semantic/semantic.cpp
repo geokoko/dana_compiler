@@ -205,7 +205,9 @@ void setSymbolParamsFromHeader(Symbol* symbol, const SemContext::HeaderInfo& inf
 	auto* func = static_cast<FuncSymbol*>(symbol);
 	func->clearParams();
 	for (const auto& param : info.params) {
-		func->addParam(std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc));
+		auto p = std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
+		p->setDefiningFunc(func);
+		func->addParam(std::move(p));
 	}
 }
 
@@ -237,10 +239,25 @@ bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
 	return true;
 }
 
+/* Returns the currently active function symbol (if any) */
+FuncSymbol* currentFuncSymbol(SemContext& context) {
+	auto* frame = context.currentFunction();
+	return frame ? static_cast<FuncSymbol*>(frame->symbol) : nullptr;
+}
+
+/* Tags a symbol with the function in which it is defined */
+void tagDefiningFunc(Symbol* symbol, SemContext& context) {
+	if (!symbol) {
+		return;
+	}
+	symbol->setDefiningFunc(currentFuncSymbol(context));
+}
+
 /* Declares function/procedure parameters in the current scope */
 void declareParamsInScope(const SemContext::HeaderInfo& info, SemContext& context) {
 	for (const auto& param : info.params) {
 		auto sym = std::make_unique<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
+		tagDefiningFunc(sym.get(), context);
 		context.declareSymbol(std::move(sym));
 	}
 }
@@ -388,6 +405,7 @@ void VarDef::sem(SemContext& context) {
 	for (const auto& id : names) {
 		auto sym = std::make_unique<VarSymbol>(id, resolved, loc);
 		VarSymbol* raw = sym.get();
+		tagDefiningFunc(raw, context);
 		context.declareSymbol(std::move(sym));
 		symbols_.push_back(raw);
 	}
@@ -412,6 +430,7 @@ void FuncDecl::sem(SemContext& context) {
 			return;
 		}
 		setSymbolParamsFromHeader(symbol, *info);
+		tagDefiningFunc(symbol, context);
 		symbol->markForwardDeclaration();
 		header->setSymbol(static_cast<FuncSymbol*>(symbol));
 		return;
@@ -419,6 +438,7 @@ void FuncDecl::sem(SemContext& context) {
 
 	auto sym = makeFunctionSymbol(*info);
 	Symbol* raw = sym.get();
+	tagDefiningFunc(raw, context);
 	context.declareSymbol(std::move(sym));
 	raw->markForwardDeclaration();
 	header->setSymbol(static_cast<FuncSymbol*>(raw));
@@ -448,6 +468,7 @@ void FuncDef::sem(SemContext& context) {
 		context.declareSymbol(std::move(sym));
 	}
 
+	tagDefiningFunc(symbol, context);
 	header->setSymbol(static_cast<FuncSymbol*>(symbol));
 
 	context.openScope();

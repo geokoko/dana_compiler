@@ -24,6 +24,14 @@ SourceLoc Symbol::getLocation() const {
     return loc_;
 }
 
+FuncSymbol* Symbol::definingFunc() const {
+	return definingFunc_;
+}
+
+void Symbol::setDefiningFunc(FuncSymbol* f) {
+	definingFunc_ = f;
+}  
+
 bool Symbol::isVariable() const {
 	return kind_ == SymKind::VAR;
 }
