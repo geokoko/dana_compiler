@@ -7,6 +7,7 @@
 #include "../common/source_location.hpp"
 #include "sematype.hpp"
 
+class FuncSymbol;
 class Symbol {
 public:
 	enum class SymKind {
@@ -25,9 +26,11 @@ public:
 	SymKind getKind() const;
 	const SemaTypePtr& getType() const;
 	SourceLoc getLocation() const;
+	FuncSymbol* definingFunc() const;
+	void setDefiningFunc(FuncSymbol* f);
+
 	bool isVariable() const;
 	bool isParameter() const;
-
 	void markForwardDeclaration();
 	void markDefined();
 	bool isDefined() const;
@@ -40,6 +43,7 @@ private:
 	SymKind kind_;
 	SemaTypePtr type_;
 	SourceLoc loc_;
+	FuncSymbol* definingFunc_ = nullptr;
 	bool isForward_ = false;
 	bool isDefined_ = false;
 };
