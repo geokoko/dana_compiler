@@ -12,22 +12,26 @@ void LLVMCodegen::gen(Program& n) {
 
 void LLVMCodegen::gen(FuncDef& n) {
 	auto* header = n.funcHeader();
-	// fetch function symbol from header node
 	auto* funcSym = header ? header->symbol() : nullptr;
 	if (!funcSym) {
+		value = nullptr;
 		return;
 	}
 
 	auto* sig = static_cast<const FuncType*>(funcSym->getType().get());
 
-	// Store function parameter types as LLVM Types
-	// and use them to create a LLVM function type
+	// Build function parameter types (prepend static link if needed)
 	std::vector<llvm::Type*> paramTypes;
-	paramTypes.reserve(funcSym->getParams().size());
+	auto* frameInfo = genCtx.frameInfo(funcSym);
+	const bool needsStaticLink = frameInfo && frameInfo->hasFrame && funcSym->definingFunc();
+	if (needsStaticLink) {
+		// TODO: use the defining function's frame pointer type here
+		paramTypes.push_back(/* static link pointer type */);
+	}
 	for (const auto& p : funcSym->getParams()) {
 		paramTypes.push_back(genCtx.getLLVMType(*p->getType(), /*forParam=*/true));
 	}
-	// capture function return type and store it as LLVM type
+
 	auto* retTy = genCtx.getLLVMType(*sig->returnType());
 	auto* fnTy = llvm::FunctionType::get(retTy, paramTypes, /*isVarArg=*/false);
 
@@ -44,20 +48,36 @@ void LLVMCodegen::gen(FuncDef& n) {
 	// for mem allocation in stack frame
 	llvm::IRBuilder<> allocaBuilder(&fn->getEntryBlock(), fn->getEntryBlock().begin());
 
+	llvm::Value* framePtr = nullptr;
+	if (frameInfo && frameInfo->hasFrame) {
+		// TODO: allocate the frame struct, store static link in field 0, and keep the resulting pointer
+		// framePtr = allocaBuilder.CreateAlloca(/* frame struct type */);
+	}
+
+	genCtx.enterFunction(funcSym, framePtr);
+
+	// Bind the static link argument if present
+	auto argIt = fn->arg_begin();
+	if (needsStaticLink && argIt != fn->arg_end()) {
+		argIt->setName("static_link");
+		// TODO: decide whether to store static link inside framePtr or keep as-is
+		++argIt;
+	}
+
 	// bind param symbols, allocate memory and add them as function arguments to LLVM func
-	std::size_t idx = 0;
-	for (auto& arg : fn->args()) {
-		arg.setName(funcSym->getParams()[idx]->getName());
-		if (funcSym->getParams()[idx]->getPass() == Symbol::ParamPass::BY_REF) {
-			// if passed by reference, do not allocate stack space; argument is a pointer
-			genCtx.bindValue(funcSym->getParams()[idx].get(), &arg);
+	for (std::size_t i = 0; i < funcSym->getParams().size() && argIt != fn->arg_end(); ++i, ++argIt) {
+		auto& arg = *argIt;
+		arg.setName(funcSym->getParams()[i]->getName());
+		const bool byRef = funcSym->getParams()[i]->getPass() == Symbol::ParamPass::BY_REF;
+		if (byRef) {
+			// TODO: if captured, store pointer in frame; otherwise bind directly
+			genCtx.bindValue(funcSym->getParams()[i].get(), &arg);
 		} else {
-			// allocate stack space
+			// TODO: decide whether param lives in frame or stack; default to stack alloca
 			auto* slot = allocaBuilder.CreateAlloca(arg.getType(), nullptr, arg.getName() + ".addr");
 			genCtx.builder().CreateStore(&arg, slot);
-			genCtx.bindValue(funcSym->getParams()[idx].get(), slot);
+			genCtx.bindValue(funcSym->getParams()[i].get(), slot);
 		}
-		++idx;
 	}
 
 	// local defs handling
@@ -65,10 +85,14 @@ void LLVMCodegen::gen(FuncDef& n) {
 		if (auto* var = dynamic_cast<VarDef*>(def.get())) {
 			const auto& syms = var->symbols();
 			for (auto* sym : syms) {
-				auto* ty = genCtx.getLLVMType(*sym->getType());
-				// allocate stack space
-				auto* slot = allocaBuilder.CreateAlloca(ty, nullptr, sym->getName());
-				genCtx.bindValue(sym, slot);
+				if (frameInfo && frameInfo->fieldIndex.count(sym)) {
+					// TODO: GEP into framePtr using fieldIndex to bind captured locals
+				} else {
+					auto* ty = genCtx.getLLVMType(*sym->getType());
+					// TODO: this path is for non-captured locals; stack allocas are fine
+					auto* slot = allocaBuilder.CreateAlloca(ty, nullptr, sym->getName());
+					genCtx.bindValue(sym, slot);
+				}
 			}
 		}
 	}
@@ -80,10 +104,12 @@ void LLVMCodegen::gen(FuncDef& n) {
 
 	// if no terminator for current block, set return type
 	if (!entry->getTerminator()) {
+		// TODO: pick default return: void or undef of retTy
 		if (retTy->isVoidTy()) genCtx.builder().CreateRetVoid();
 		else genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
 	}
 
+	genCtx.leaveFunction();
 	// no value to be returned
 	value = nullptr;
 
@@ -105,31 +131,25 @@ void LLVMCodegen::gen(ExitStmt& n) {
 }
 
 void LLVMCodegen::gen(AssignStmt& n) {
-	// generate code for the right-hand side expression
+	llvm::Value* rhsValue = nullptr;
+	llvm::Value* lhsAddress = nullptr;
+
 	if (auto* rhs = n.right()) {
-		rhs->agen(*this);
+		// TODO: call genExpr(rhs) to produce the value
+		rhsValue = /* genExpr(*rhs) */;
 	}
-
-	// generate code for the left-hand side lvalue
 	if (auto* lhs = n.left()) {
-		lhs->agen(*this);
+		// TODO: call genAddress(lhs) to produce the destination pointer
+		lhsAddress = /* genAddress(*lhs) */;
 	}
 
-	// perform the assignment
-	llvm::Value* rhsValue = /* get the value from rhs */;
-	llvm::Value* lhsAddress = /* get the address from lhs */;
-	genCtx.builder().CreateStore(rhsValue, lhsAddress);
+	// TODO: handle any needed type conversions 
+	// genCtx.builder().CreateStore(rhsValue, lhsAddress);
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(ReturnStmt& n) {
-	// generate code for the return value expression
-	if (auto* rv = n.returnValue()) {
-		rv->agen(*this);
-	}
 
-	// create the return instruction
-	llvm::Value* retValue = /* get the value from return expression */;
-	genCtx.builder().CreateRet(retValue);
 }
 
 void LLVMCodegen::gen(ProcCall& n) {
@@ -145,23 +165,27 @@ void LLVMCodegen::gen(ContinueStmt& n) {
 }
 
 void LLVMCodegen::gen(IfStmt& n) {
-	(void)n;
 }
 
 void LLVMCodegen::gen(LoopStmt& n) {
-	(void)n;
 }
 
 void LLVMCodegen::gen(IdLVal& n) {
-	(void)n;
+	// TODO: prefer using getVarAddress with the bound symbol
+	value = getVarAddress(n.symbol());
 }
 
 void LLVMCodegen::gen(StringLiteralLVal& n) {
+	// TODO: materialize/lookup a global string constant and return its address
 	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(IndexLVal& n) {
+	// TODO: compute base address (call genAddress on base) and index value (genExpr)
+	// TODO: GEP into element and set value to resulting address
 	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(IntConst& n) {
@@ -186,7 +210,8 @@ void LLVMCodegen::gen(FalseConst& n) {
 
 void LLVMCodegen::gen(LValueExpr& n) {
 	// get address of the lvalue
-	llvm::Value* addr = /* get address from lvalue */;
+	llvm::Value* addr = /* genAddress(*n.value()) */;
+	// TODO: handle type casting/loading rules
 	auto elemType = genCtx.getLLVMType(*n.type());
 	value = genCtx.builder().CreateLoad(elemType, addr);
 }
@@ -204,35 +229,84 @@ void LLVMCodegen::gen(UnaryExpr& n) {
 }
 
 void LLVMCodegen::gen(BinaryExpr& n) {
-	(void)n;
+	// TODO: evaluate operands	
+	// // TODO: insert casts so both operands have the expected LLVM type (i32/i8)
+	switch (n.getOp()) {
+		case BinOp::Add:
+			value =
+			break;
+		case BinOp::Sub:
+			value = 
+			break;
+		case BinOp::Mul:
+			value =
+			break;
+		case BinOp::Div:
+			value = 
+			break;
+		case BinOp::Mod:
+			value =
+			break;
+		case BinOp::AndBits:
+			value =
+			break;
+		case BinOp::OrBits:
+			value = 
+			break;
+		default:
+			// TODO: handle any additional operators if added later
+			value = nullptr;
+			break;
+	}
 }
 
 void LLVMCodegen::gen(ExprCond& n) {
+	// TODO: call genExpr on the inner expression and ensure it is cast/compared to i1
 	(void)n;
 }
 
 void LLVMCodegen::gen(ParenCond& n) {
+	// TODO: just delegate to the wrapped condition
 	(void)n;
 }
 
 void LLVMCodegen::gen(NotCond& n) {
+	// TODO: emit the operand condition then CreateNot on the resulting i1/i8
 	(void)n;
 }
 
 void LLVMCodegen::gen(BinaryCond& n) {
+	// TODO: short-circuiting AND/OR using basic blocks and CreateCondBr
 	(void)n;
 }
 
 void LLVMCodegen::gen(RelCond& n) {
+	// TODO: evaluate lhs/rhs via genExpr, cast to matching integer types, then CreateICmp*
 	(void)n;
 }
 
 llvm::Value* LLVMCodegen::genAddress(Lval& lv) {
-	(void)lv;
-	return nullptr;
+	lv.agen(*this);
+	// TODO: ensure l-value visitors leave 'value' as the address of the l-value
+	return value;
 }
 
 llvm::Value* LLVMCodegen::genExpr(Expr& e) {
 	e.agen(*this);
 	return value;
+}
+
+llvm::Value* LLVMCodegen::getVarAddress(const Symbol* sym) {
+	if (!sym) {
+		return nullptr;
+	}
+
+	// TODO: implement address loading
+	return genCtx.lookupValue(sym);
+}
+
+llvm::Value* LLVMCodegen::makeStaticLink(const FuncSymbol* callee) {
+	if (!callee || !callee->definingFunc()) {
+		return nullptr; // top-level function: no static link
+	}
 }
