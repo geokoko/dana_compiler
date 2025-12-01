@@ -1,9 +1,8 @@
 #include "codegen.hpp"
 
 #include <memory>
-#include <string>
-#include <unordered_map>
 #include <vector>
+
 void LLVMCodegen::gen(Program& n) {
 	if (auto* def = n.definition()) {
 		def->agen(*this);
@@ -11,6 +10,7 @@ void LLVMCodegen::gen(Program& n) {
 }
 
 void LLVMCodegen::gen(FuncDef& n) {
+	/* Resolve function symbol */
 	auto* header = n.funcHeader();
 	auto* funcSym = header ? header->symbol() : nullptr;
 	if (!funcSym) {
@@ -18,101 +18,136 @@ void LLVMCodegen::gen(FuncDef& n) {
 		return;
 	}
 
-	auto* sig = static_cast<const FuncType*>(funcSym->getType().get());
+	// Get or create FrameInfo for this function
+	auto* frameInfo = genCtx.getFrameInfo(funcSym);
 
-	// Build function parameter types (prepend static link if needed)
-	std::vector<llvm::Type*> paramTypes;
-	auto* frameInfo = genCtx.frameInfo(funcSym);
-	const bool needsStaticLink = frameInfo && frameInfo->hasFrame && funcSym->definingFunc();
-	if (needsStaticLink) {
-		// TODO: use the defining function's frame pointer type here
-		paramTypes.push_back(/* static link pointer type */);
-	}
-	for (const auto& p : funcSym->getParams()) {
-		paramTypes.push_back(genCtx.getLLVMType(*p->getType(), /*forParam=*/true));
-	}
+	frameInfo->funcSymbol = funcSym;
 
-	auto* retTy = genCtx.getLLVMType(*sig->returnType());
-	auto* fnTy = llvm::FunctionType::get(retTy, paramTypes, /*isVarArg=*/false);
-
-	// map symbol to LLVM function (if not already done)
-	auto* fn = genCtx.lookupFunction(funcSym);
-	if (!fn) {
-		fn = llvm::Function::Create(fnTy, llvm::Function::ExternalLinkage, funcSym->getName(), &genCtx.llvmModule());
-		genCtx.bindFunction(funcSym, fn);
-	}
-
-	// Function definitions open scopes -> Basic Block in LLVM
-	auto* entry = llvm::BasicBlock::Create(genCtx.llvmContext(), funcSym->getName() + "_entry", fn);
-	genCtx.builder().SetInsertPoint(entry);
-	// for mem allocation in stack frame
-	llvm::IRBuilder<> allocaBuilder(&fn->getEntryBlock(), fn->getEntryBlock().begin());
-
-	llvm::Value* framePtr = nullptr;
-	if (frameInfo && frameInfo->hasFrame) {
-		// TODO: allocate the frame struct, store static link in field 0, and keep the resulting pointer
-		// framePtr = allocaBuilder.CreateAlloca(/* frame struct type */);
-	}
-
-	genCtx.enterFunction(funcSym, framePtr);
-
-	// Bind the static link argument if present
-	auto argIt = fn->arg_begin();
-	if (needsStaticLink && argIt != fn->arg_end()) {
-		argIt->setName("static_link");
-		// TODO: decide whether to store static link inside framePtr or keep as-is
-		++argIt;
-	}
-
-	// bind param symbols, allocate memory and add them as function arguments to LLVM func
-	for (std::size_t i = 0; i < funcSym->getParams().size() && argIt != fn->arg_end(); ++i, ++argIt) {
-		auto& arg = *argIt;
-		arg.setName(funcSym->getParams()[i]->getName());
-		const bool byRef = funcSym->getParams()[i]->getPass() == Symbol::ParamPass::BY_REF;
-		if (byRef) {
-			// TODO: if captured, store pointer in frame; otherwise bind directly
-			genCtx.bindValue(funcSym->getParams()[i].get(), &arg);
-		} else {
-			// TODO: decide whether param lives in frame or stack; default to stack alloca
-			auto* slot = allocaBuilder.CreateAlloca(arg.getType(), nullptr, arg.getName() + ".addr");
-			genCtx.builder().CreateStore(&arg, slot);
-			genCtx.bindValue(funcSym->getParams()[i].get(), slot);
+	/* Determine parent frame type for static link */
+	llvm::StructType* parentFrameTy = nullptr;
+	if (auto* parentSym = funcSym->definingFunc()) {
+		if (auto* parentInfo = genCtx.getFrameInfo(parentSym)) {
+			parentFrameTy = parentInfo->frameTy;
 		}
 	}
 
-	// local defs handling
+	/* Build frame layout */
+	std::vector<llvm::Type*> paramTys;
+	std::vector<llvm::Type*> localTys;
+	// build static link field 0
+	llvm::Type* staticLinkTy = parentFrameTy ? llvm::PointerType::getUnqual(parentFrameTy)
+											 : llvm::Type::getInt8PtrTy(genCtx.llvmContext());
+	// build parameter and local variable fields
+	std::size_t fieldIndex = 1; // 0 reserved for static link
+
+	/* Collect parameters and local variables into frame */
+	for (const auto& p : funcSym->getParams()) {
+		// add parameter slots and capture them
+		paramTys.push_back(genCtx.getLLVMType(*p->getType(), /*forParam=*/true));
+		frameInfo->captureVar(p.get(), fieldIndex++);
+	}
 	for (auto& def : n.localDefs()) {
 		if (auto* var = dynamic_cast<VarDef*>(def.get())) {
-			const auto& syms = var->symbols();
-			for (auto* sym : syms) {
-				if (frameInfo && frameInfo->fieldIndex.count(sym)) {
-					// TODO: GEP into framePtr using fieldIndex to bind captured locals
-				} else {
-					auto* ty = genCtx.getLLVMType(*sym->getType());
-					// TODO: this path is for non-captured locals; stack allocas are fine
-					auto* slot = allocaBuilder.CreateAlloca(ty, nullptr, sym->getName());
-					genCtx.bindValue(sym, slot);
-				}
+			for (auto* sym : var->symbols()) {
+				// add local variable slots and capture them
+				localTys.push_back(genCtx.getLLVMType(*sym->getType()));
+				frameInfo->captureVar(sym, fieldIndex++);
 			}
 		}
 	}
 
-	// handle func body
+	if (!frameInfo->frameTy) {
+		frameInfo->frameTy = llvm::StructType::create(genCtx.llvmContext(), funcSym->getName() + ".frame");
+	}
+
+	// set frame body: static link + params + locals
+	std::vector<llvm::Type*> frameFields;
+	frameFields.reserve(1 + paramTys.size() + localTys.size());
+	frameFields.push_back(staticLinkTy);
+	frameFields.insert(frameFields.end(), paramTys.begin(), paramTys.end());
+	frameFields.insert(frameFields.end(), localTys.begin(), localTys.end());
+	frameInfo->frameTy->setBody(frameFields, /*isPacked=*/false);
+	
+	/* Create LLVM function type */
+	const auto* funcTy = static_cast<const FuncType*>(funcSym->getType().get());
+
+	// get & set return type
+	std::vector<llvm::Type*> stLinkAndParamTys;
+
+	if (funcSym->definingFunc()) {
+		// add static link as first param
+		stLinkAndParamTys.push_back(staticLinkTy);
+	}
+	stLinkAndParamTys.insert(stLinkAndParamTys.end(), paramTys.begin(), paramTys.end());
+	llvm::Type* retTy = genCtx.getLLVMType(*funcTy->returnType());
+	llvm::FunctionType* fnTy = llvm::FunctionType::get(retTy, stLinkAndParamTys, /*isVarArg=*/false);
+	llvm::Function* llvmFunc = llvm::Function::Create(fnTy, llvm::Function::ExternalLinkage, 
+												   funcSym->getName(), &genCtx.llvmModule());
+
+	frameInfo->llvmFunc = llvmFunc;
+
+	/* Create LLVM function basic block and set insertion point */
+	auto* entry = llvm::BasicBlock::Create(genCtx.llvmContext(), funcSym->getName() + ".entry", llvmFunc);
+	genCtx.builder().SetInsertPoint(entry);
+	/* Put allocas for frame and bind frame pointer */
+	llvm::Value* framePtr = genCtx.builder().CreateAlloca(frameInfo->frameTy, nullptr, funcSym->getName() + ".frame");
+
+	genCtx.enterFunction(funcSym, framePtr);
+	
+	/* Bind static link and parameters to frame fields */
+	auto argIt = llvmFunc->arg_begin();
+	
+	if (funcSym->definingFunc()) {
+		// bind static link
+		argIt->setName("staticlink.arg");
+		llvm::Value* staticLinkArg = &*argIt++;
+		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr, 0, "staticlink.ptr");
+		genCtx.builder().CreateStore(staticLinkArg, staticLinkPtr);
+	} else {
+		// no static link, bind null
+		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr, 0, "staticlink.ptr");
+		llvm::Value* nullPtr = llvm::Constant::getNullValue(staticLinkTy);
+		genCtx.builder().CreateStore(nullPtr, staticLinkPtr);
+	}
+
+	// bind parameters
+	for (const auto& p : funcSym->getParams()) {
+		llvm::Value* paramArg = &*argIt++;
+		llvm::Value* paramPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr,
+																frameInfo->capturedVars[p.get()], p->getName() + ".ptr");
+		// store parameter into frame (call by value)
+		genCtx.builder().CreateStore(paramArg, paramPtr);
+		genCtx.bindValue(p.get(), paramPtr);
+		// TODO: handle by-ref parameters
+	}
+
+	/* Bind local variables to function frame */
+	for (auto& def : n.localDefs()) {
+		if (auto* var = dynamic_cast<VarDef*>(def.get())) {
+			for (auto* sym : var->symbols()) {
+				llvm::Value* localPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr, 
+															 frameInfo->capturedVars[sym], sym->getName() + ".ptr");
+				genCtx.bindValue(sym, localPtr);
+			}
+		}
+	}
+
+	/* Generate function body */
 	if (n.funcBody()) {
 		n.funcBody()->agen(*this);
 	}
 
-	// if no terminator for current block, set return type
+	/* Default return if none emitted */
 	if (!entry->getTerminator()) {
-		// TODO: pick default return: void or undef of retTy
-		if (retTy->isVoidTy()) genCtx.builder().CreateRetVoid();
-		else genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
+		if (retTy->isVoidTy()) {
+			genCtx.builder().CreateRetVoid();
+		} else {
+			genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
+		}
 	}
 
 	genCtx.leaveFunction();
-	// no value to be returned
 	value = nullptr;
-
 }
 
 void LLVMCodegen::gen(Block& n) {
@@ -135,44 +170,69 @@ void LLVMCodegen::gen(AssignStmt& n) {
 	llvm::Value* lhsAddress = nullptr;
 
 	if (auto* rhs = n.right()) {
-		// TODO: call genExpr(rhs) to produce the value
-		rhsValue = /* genExpr(*rhs) */;
+		rhs->agen(*this);
+		rhsValue = value;
 	}
 	if (auto* lhs = n.left()) {
-		// TODO: call genAddress(lhs) to produce the destination pointer
-		lhsAddress = /* genAddress(*lhs) */;
+		lhs->agen(*this);
+		lhsAddress = value;
 	}
 
-	// TODO: handle any needed type conversions 
-	// genCtx.builder().CreateStore(rhsValue, lhsAddress);
+	if (rhsValue && lhsAddress) {
+		genCtx.builder().CreateStore(rhsValue, lhsAddress);
+	}
 	value = nullptr;
 }
 
 void LLVMCodegen::gen(ReturnStmt& n) {
+	(void)n;
+	// Simple return handling: return value if present, else void
+	if (!genCtx.currentFunc()) {
+		value = nullptr;
+		return;
+	}
+	auto* fnSym = genCtx.currentFunc();
+	auto* sig = static_cast<const FuncType*>(fnSym->getType().get());
+	auto* retTy = sig ? genCtx.getLLVMType(*sig->returnType()) : genCtx.builder().getVoidTy();
 
+		if (auto* expr = n.returnValue()) {
+			expr->agen(*this);
+			auto* v = value;
+			genCtx.builder().CreateRet(v ? v : llvm::UndefValue::get(retTy));
+	} else {
+		if (retTy->isVoidTy()) genCtx.builder().CreateRetVoid();
+		else genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
+	}
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(ProcCall& n) {
 	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(BreakStmt& n) {
 	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(ContinueStmt& n) {
 	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(IfStmt& n) {
+	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(LoopStmt& n) {
+	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(IdLVal& n) {
-	// TODO: prefer using getVarAddress with the bound symbol
-	value = getVarAddress(n.symbol());
+	value = genCtx.lookupValue(n.symbol());
 }
 
 void LLVMCodegen::gen(StringLiteralLVal& n) {
@@ -210,69 +270,152 @@ void LLVMCodegen::gen(FalseConst& n) {
 
 void LLVMCodegen::gen(LValueExpr& n) {
 	// get address of the lvalue
-	llvm::Value* addr = /* genAddress(*n.value()) */;
-	// TODO: handle type casting/loading rules
+	llvm::Value* addr = nullptr;
+	if (auto* lv = n.lvalue()) {
+		lv->agen(*this);
+		addr = value;
+	}
+	if (!addr) {
+		value = nullptr;
+		return;
+	}
 	auto elemType = genCtx.getLLVMType(*n.type());
 	value = genCtx.builder().CreateLoad(elemType, addr);
 }
 
 void LLVMCodegen::gen(ParenExpr& n) {
-	(void)n;
+	if (auto* inner = n.innerExpr()) {
+		inner->agen(*this);
+	} else {
+		value = nullptr;
+	}
 }
 
 void LLVMCodegen::gen(FuncCall& n) {
 	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(UnaryExpr& n) {
-	(void)n;
+	llvm::Value* operand = nullptr;
+	if (auto* expr = n.operandExpr()) {
+		expr->agen(*this);
+		operand = value;
+	}
+	if (!operand) {
+		value = nullptr;
+		return;
+	}
+
+	switch (n.opKind()) {
+		case UnOp::Plus:
+			value = operand;
+			break;
+		case UnOp::Minus:
+			value = genCtx.builder().CreateNeg(operand);
+			break;
+		case UnOp::Not:
+			value = genCtx.builder().CreateNot(operand);
+			break;
+	}
 }
 
 void LLVMCodegen::gen(BinaryExpr& n) {
-	// TODO: evaluate operands	
-	// // TODO: insert casts so both operands have the expected LLVM type (i32/i8)
-	switch (n.getOp()) {
+	llvm::Value* lhs = nullptr;
+	llvm::Value* rhs = nullptr;
+	if (auto* left = n.leftExpr()) {
+		left->agen(*this);
+		lhs = value;
+	}
+	if (auto* right = n.rightExpr()) {
+		right->agen(*this);
+		rhs = value;
+	}
+	if (!lhs || !rhs) {
+		value = nullptr;
+		return;
+	}
+	switch (n.opKind()) {
 		case BinOp::Add:
-			value =
+			value = genCtx.builder().CreateAdd(lhs, rhs);
 			break;
 		case BinOp::Sub:
-			value = 
+			value = genCtx.builder().CreateSub(lhs, rhs);
 			break;
 		case BinOp::Mul:
-			value =
+			value = genCtx.builder().CreateMul(lhs, rhs);
 			break;
 		case BinOp::Div:
-			value = 
+			value = genCtx.builder().CreateSDiv(lhs, rhs);
 			break;
 		case BinOp::Mod:
-			value =
+			value = genCtx.builder().CreateSRem(lhs, rhs);
 			break;
 		case BinOp::AndBits:
-			value =
+			value = genCtx.builder().CreateAnd(lhs, rhs);
 			break;
 		case BinOp::OrBits:
-			value = 
+			value = genCtx.builder().CreateOr(lhs, rhs);
 			break;
 		default:
-			// TODO: handle any additional operators if added later
 			value = nullptr;
 			break;
 	}
 }
 
 void LLVMCodegen::gen(ExprCond& n) {
-	// TODO: call genExpr on the inner expression and ensure it is cast/compared to i1
-	(void)n;
+	auto* expr = n.expression();
+	if (!expr) {
+		value = nullptr;
+		return;
+	}
+	expr->agen(*this);
+	auto* condVal = value;
+	if (!condVal) {
+		value = nullptr;
+		return;
+	}
+	if (condVal->getType()->isIntegerTy(1)) {
+		value = condVal;
+		return;
+	}
+	if (condVal->getType()->isIntegerTy()) {
+		auto* zero = llvm::ConstantInt::get(condVal->getType(), 0);
+		value = genCtx.builder().CreateICmpNE(condVal, zero, "boolcast");
+		return;
+	}
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(ParenCond& n) {
-	// TODO: just delegate to the wrapped condition
-	(void)n;
+	if (auto* inner = n.conditionExpr()) {
+		inner->agen(*this);
+	} else {
+		value = nullptr;
+	}
 }
 
 void LLVMCodegen::gen(NotCond& n) {
-	// TODO: emit the operand condition then CreateNot on the resulting i1/i8
-	(void)n;
+	auto* inner = n.conditionExpr();
+	if (!inner) {
+		value = nullptr;
+		return;
+	}
+	inner->agen(*this);
+	auto* condVal = value;
+	if (!condVal) {
+		return;
+	}
+	if (!condVal->getType()->isIntegerTy(1)) {
+		if (condVal->getType()->isIntegerTy()) {
+			auto* zero = llvm::ConstantInt::get(condVal->getType(), 0);
+			condVal = genCtx.builder().CreateICmpNE(condVal, zero, "boolcast");
+		} else {
+			value = nullptr;
+			return;
+		}
+	}
+	value = genCtx.builder().CreateNot(condVal, "nottmp");
 }
 
 void LLVMCodegen::gen(BinaryCond& n) {
@@ -283,30 +426,4 @@ void LLVMCodegen::gen(BinaryCond& n) {
 void LLVMCodegen::gen(RelCond& n) {
 	// TODO: evaluate lhs/rhs via genExpr, cast to matching integer types, then CreateICmp*
 	(void)n;
-}
-
-llvm::Value* LLVMCodegen::genAddress(Lval& lv) {
-	lv.agen(*this);
-	// TODO: ensure l-value visitors leave 'value' as the address of the l-value
-	return value;
-}
-
-llvm::Value* LLVMCodegen::genExpr(Expr& e) {
-	e.agen(*this);
-	return value;
-}
-
-llvm::Value* LLVMCodegen::getVarAddress(const Symbol* sym) {
-	if (!sym) {
-		return nullptr;
-	}
-
-	// TODO: implement address loading
-	return genCtx.lookupValue(sym);
-}
-
-llvm::Value* LLVMCodegen::makeStaticLink(const FuncSymbol* callee) {
-	if (!callee || !callee->definingFunc()) {
-		return nullptr; // top-level function: no static link
-	}
 }
