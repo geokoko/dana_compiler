@@ -102,8 +102,4 @@ private:
 	// Generate address of an lvalue
 	llvm::Value* genAddress(Lval& lv);
 
-    // helpers
-    llvm::Value* genExpr(Expr& e);
-	llvm::Value* getVarAddress(const Symbol* sym);
-	llvm::Value* makeStaticLinkArg(const FuncSymbol* callee);
-};
+	};
