@@ -106,15 +106,18 @@ void LLVMCodegen::gen(FuncDef& n) {
 	} else {
 		// no static link, bind null
 		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr, 0, "staticlink.ptr");
-		llvm::Value* nullPtr = llvm::Constant::getNullValue(staticLinkTy);
+		llvm::Value* nullPtr = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(staticLinkTy));		
 		genCtx.builder().CreateStore(nullPtr, staticLinkPtr);
 	}
 
 	// bind parameters
 	for (const auto& p : funcSym->getParams()) {
+		auto it = frameInfo->capturedVars.find(p.get());
+		assert(it != frameInfo->capturedVars.end());
+		auto idx = it->second;
 		llvm::Value* paramArg = &*argIt++;
 		llvm::Value* paramPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr,
-																frameInfo->capturedVars[p.get()], p->getName() + ".ptr");
+																idx, p->getName() + ".ptr");
 		// store parameter into frame (call by value)
 		genCtx.builder().CreateStore(paramArg, paramPtr);
 		genCtx.bindValue(p.get(), paramPtr);
@@ -185,7 +188,6 @@ void LLVMCodegen::gen(AssignStmt& n) {
 }
 
 void LLVMCodegen::gen(ReturnStmt& n) {
-	(void)n;
 	// Simple return handling: return value if present, else void
 	if (!genCtx.currentFunc()) {
 		value = nullptr;
