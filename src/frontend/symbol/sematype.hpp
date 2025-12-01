@@ -81,7 +81,7 @@ private:
 	std::vector<SemaTypePtr> params_;
 };
 
-// ---------- Void type (for procs / "no value") ----------
+// ---------- Void type (for procs / "no value") / used for return only ----------
 
 class VoidType : public SemaType {
 public:
