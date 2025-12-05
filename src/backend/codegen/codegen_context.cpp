@@ -9,6 +9,38 @@ CodegenContext::CodegenContext(const std::string& moduleName) {
 CodegenContext::FrameInfo::FrameInfo(const Symbol* sym, llvm::Function* fn, llvm::BasicBlock* entry, llvm::StructType* frameType)
 								: funcSymbol(sym), llvmFunc(fn), entryBlock(entry), frameTy(frameType) {}
 
+void CodegenContext::FrameInfo::setFunctionSymbol(const Symbol* sym) {
+	funcSymbol = sym;
+}
+
+const Symbol* CodegenContext::FrameInfo::functionSymbol() const {
+	return funcSymbol;
+}
+
+void CodegenContext::FrameInfo::setLLVMFunction(llvm::Function* fn) {
+	llvmFunc = fn;
+}
+
+llvm::Function* CodegenContext::FrameInfo::llvmFunction() {
+	return llvmFunc;
+}
+
+const llvm::Function* CodegenContext::FrameInfo::llvmFunction() const {
+	return llvmFunc;
+}
+
+void CodegenContext::FrameInfo::setFrameType(llvm::StructType* frameType) {
+	frameTy = frameType;
+}
+
+llvm::StructType* CodegenContext::FrameInfo::frameType() {
+	return frameTy;
+}
+
+llvm::StructType* CodegenContext::FrameInfo::frameType() const {
+	return frameTy;
+}
+
 llvm::Value* CodegenContext::FrameInfo::lookupValue(const Symbol* sym) const {
 	auto it = valueMap_.find(sym);
 	return it == valueMap_.end() ? nullptr : it->second;
@@ -22,6 +54,17 @@ void CodegenContext::FrameInfo::bindValue(const Symbol* sym, llvm::Value* value)
 void CodegenContext::FrameInfo::captureVar(const Symbol* sym, std::size_t index) {
 	if (!sym) return;
 	capturedVars[sym] = index;
+}
+
+std::optional<std::size_t> CodegenContext::FrameInfo::getCapturedVarIndex(const Symbol* sym) const {
+	if (!sym) {
+		return std::nullopt;
+	}
+	auto it = capturedVars.find(sym);
+	if (it == capturedVars.end()) {
+		return std::nullopt;
+	}
+	return it->second;
 }
 
 llvm::Value* CodegenContext::lookupValue(const Symbol* sym) const {
@@ -146,4 +189,3 @@ const FuncSymbol* CodegenContext::currentFunc() const {
 llvm::Value* CodegenContext::currentFramePtr() const {
 	return currentFramePtr_;
 }
-
