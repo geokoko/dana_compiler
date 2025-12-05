@@ -19,14 +19,14 @@ void LLVMCodegen::gen(FuncDef& n) {
 	}
 
 	// Get or create FrameInfo for this function
-	auto* frameInfo = genCtx.getFrameInfo(funcSym);
+	auto* frameInfo = genCtx.createFrameInfo(funcSym);
 
 	frameInfo->funcSymbol = funcSym;
 
 	/* Determine parent frame type for static link */
 	llvm::StructType* parentFrameTy = nullptr;
 	if (auto* parentSym = funcSym->definingFunc()) {
-		if (auto* parentInfo = genCtx.getFrameInfo(parentSym)) {
+		if (const auto* parentInfo = genCtx.getFrameInfo(parentSym)) {
 			parentFrameTy = parentInfo->frameTy;
 		}
 	}
@@ -81,8 +81,14 @@ void LLVMCodegen::gen(FuncDef& n) {
 	stLinkAndParamTys.insert(stLinkAndParamTys.end(), paramTys.begin(), paramTys.end());
 	llvm::Type* retTy = genCtx.getLLVMType(*funcTy->returnType());
 	llvm::FunctionType* fnTy = llvm::FunctionType::get(retTy, stLinkAndParamTys, /*isVarArg=*/false);
-	llvm::Function* llvmFunc = llvm::Function::Create(fnTy, llvm::Function::ExternalLinkage, 
-												   funcSym->getName(), &genCtx.llvmModule());
+
+	/* Create LLVM function and bind to symbol */
+	// Check if function already exists (for forward declarations)
+	llvm::Function* llvmFunc = genCtx.lookupFunction(funcSym);
+	if (!llvmFunc) {
+		llvmFunc = llvm::Function::Create(fnTy, llvm::Function::ExternalLinkage, funcSym->getName(), &genCtx.llvmModule());
+		genCtx.bindFunction(funcSym, llvmFunc);
+	}
 
 	frameInfo->llvmFunc = llvmFunc;
 
@@ -92,7 +98,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 	/* Put allocas for frame and bind frame pointer */
 	llvm::Value* framePtr = genCtx.builder().CreateAlloca(frameInfo->frameTy, nullptr, funcSym->getName() + ".frame");
 
-	genCtx.enterFunction(funcSym, framePtr);
+	genCtx.enterFunction(funcSym, frameInfo, framePtr);
 	
 	/* Bind static link and parameters to frame fields */
 	auto argIt = llvmFunc->arg_begin();
@@ -160,6 +166,7 @@ void LLVMCodegen::gen(Block& n) {
 }
 
 void LLVMCodegen::gen(SkipStmt& n) {
+	// no-op statement: do nothing
 	(void)n;
 }
 

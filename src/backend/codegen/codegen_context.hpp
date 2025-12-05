@@ -36,6 +36,11 @@ private:
 		llvm::Value* lookupValue(const Symbol* sym) const;
 		void bindValue(const Symbol* sym, llvm::Value* value);
 		void captureVar(const Symbol* sym, std::size_t index);
+
+		void pushLoop(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB);
+		void popLoop();
+		llvm::BasicBlock* currentBreakTarget() const;
+		llvm::BasicBlock* currentContinueTarget() const;
 		
 	private:
 		friend class LLVMCodegen; // allow codegen to populate frame layout
@@ -56,6 +61,7 @@ private:
 	std::unordered_map<const FuncSymbol*, FrameInfo> frameMap_;
 	const FuncSymbol* currentFunc_ = nullptr;
 	llvm::Value* currentFramePtr_ = nullptr;
+	FrameInfo* currentFrameInfo_ = nullptr;
 
 public:
     // Constructor of LLVMContext
@@ -74,6 +80,10 @@ public:
     void bindValue(const Symbol* sym, llvm::Value* value);
     llvm::Function* lookupFunction(const FuncSymbol* sym) const;
     void bindFunction(const FuncSymbol* sym, llvm::Function* fn);
+	void pushLoopTargets(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB);
+	void popLoopTargets();
+	llvm::BasicBlock* currentBreakTarget() const;
+	llvm::BasicBlock* currentContinueTarget() const;
 
 	/* Semantic Type to LLVM type translation
 	 * Type translation to an LLVM type. 
@@ -82,11 +92,11 @@ public:
     llvm::Type* getLLVMType(const SemaType& ty, bool forParam = false);
 	
 	// Track the function currently being generated and its frame pointer.
-	void enterFunction(const FuncSymbol* fn, llvm::Value* framePtr);
+	void enterFunction(const FuncSymbol* fn, FrameInfo* frameInfo, llvm::Value* framePtr);
 	void leaveFunction();
 	const FuncSymbol* currentFunc() const;
 	llvm::Value* currentFramePtr() const;
 	// Frame information access
-	FrameInfo* getFrameInfo(const FuncSymbol* fn);
+	FrameInfo* createFrameInfo(const FuncSymbol* fn);
 	const FrameInfo* getFrameInfo(const FuncSymbol* fn) const;
 };

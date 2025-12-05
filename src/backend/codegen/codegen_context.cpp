@@ -33,13 +33,10 @@ llvm::Value* CodegenContext::lookupValue(const Symbol* sym) const {
 }
 
 void CodegenContext::bindValue(const Symbol* sym, llvm::Value* value) {
-	if (!sym || !currentFunc_) {
+	if (!sym || !currentFrameInfo_) {
 		return;
 	}
-	auto* fi = getFrameInfo(currentFunc_);
-	if (fi) {
-		fi->bindValue(sym, value);
-	}
+	currentFrameInfo_->bindValue(sym, value);
 }
 
 llvm::Function* CodegenContext::lookupFunction(const FuncSymbol* sym) const {
@@ -50,6 +47,25 @@ llvm::Function* CodegenContext::lookupFunction(const FuncSymbol* sym) const {
 void CodegenContext::bindFunction(const FuncSymbol* sym, llvm::Function* fn) {
 	if (!sym) return;
 	functionMap_[sym] = fn;
+}
+
+void CodegenContext::pushLoopTargets(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB) {
+	if (!currentFrameInfo_) {
+		return;
+	}
+	currentFrameInfo_->pushLoop(breakBB, continueBB);
+}
+
+void CodegenContext::popLoopTargets() {
+	if (!currentFrameInfo_) {
+		return;
+	}
+	currentFrameInfo_->popLoop();
+}
+
+void CodegenContext::FrameInfo::pushLoop(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB) {
+	breakTargets.push_back(breakBB);
+	continueTargets.push_back(continueBB);
 }
 
 llvm::Type* CodegenContext::getLLVMType(const SemaType& ty, bool forParam) {
@@ -98,11 +114,12 @@ llvm::Type* CodegenContext::getLLVMType(const SemaType& ty, bool forParam) {
 	return nullptr;
 }
 
-CodegenContext::FrameInfo* CodegenContext::getFrameInfo(const FuncSymbol* fn) {
+CodegenContext::FrameInfo* CodegenContext::createFrameInfo(const FuncSymbol* fn) {
 	if (!fn) {
 		return nullptr;
 	}
-	return &frameMap_[fn];
+	auto [it, _] = frameMap_.try_emplace(fn);
+	return &it->second;
 }
 
 const CodegenContext::FrameInfo* CodegenContext::getFrameInfo(const FuncSymbol* fn) const {
@@ -110,14 +127,16 @@ const CodegenContext::FrameInfo* CodegenContext::getFrameInfo(const FuncSymbol* 
 	return it == frameMap_.end() ? nullptr : &it->second;
 }
 
-void CodegenContext::enterFunction(const FuncSymbol* fn, llvm::Value* framePtr) {
+void CodegenContext::enterFunction(const FuncSymbol* fn, FrameInfo* frameInfo, llvm::Value* framePtr) {
 	currentFunc_ = fn;
+	currentFrameInfo_ = frameInfo;
 	currentFramePtr_ = framePtr;
 }
 
 void CodegenContext::leaveFunction() {
 	currentFunc_ = nullptr;
 	currentFramePtr_ = nullptr;
+	currentFrameInfo_ = nullptr;
 }
 
 const FuncSymbol* CodegenContext::currentFunc() const {
@@ -127,5 +146,4 @@ const FuncSymbol* CodegenContext::currentFunc() const {
 llvm::Value* CodegenContext::currentFramePtr() const {
 	return currentFramePtr_;
 }
-
 
