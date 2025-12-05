@@ -99,7 +99,4 @@ public:
 private:
     CodegenContext& genCtx;
 
-	// Generate address of an lvalue
-	llvm::Value* genAddress(Lval& lv);
-
-	};
+};
