@@ -20,14 +20,13 @@ void LLVMCodegen::gen(FuncDef& n) {
 
 	// Get or create FrameInfo for this function
 	auto* frameInfo = genCtx.createFrameInfo(funcSym);
-
-	frameInfo->funcSymbol = funcSym;
+	frameInfo->setFunctionSymbol(funcSym);
 
 	/* Determine parent frame type for static link */
 	llvm::StructType* parentFrameTy = nullptr;
 	if (auto* parentSym = funcSym->definingFunc()) {
 		if (const auto* parentInfo = genCtx.getFrameInfo(parentSym)) {
-			parentFrameTy = parentInfo->frameTy;
+			parentFrameTy = parentInfo->frameType();
 		}
 	}
 
@@ -56,9 +55,10 @@ void LLVMCodegen::gen(FuncDef& n) {
 		}
 	}
 
-	if (!frameInfo->frameTy) {
-		frameInfo->frameTy = llvm::StructType::create(genCtx.llvmContext(), funcSym->getName() + ".frame");
+	if (!frameInfo->frameType()) {
+		frameInfo->setFrameType(llvm::StructType::create(genCtx.llvmContext(), funcSym->getName() + ".frame"));
 	}
+	auto* frameTy = frameInfo->frameType();
 
 	// set frame body: static link + params + locals
 	std::vector<llvm::Type*> frameFields;
@@ -66,7 +66,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 	frameFields.push_back(staticLinkTy);
 	frameFields.insert(frameFields.end(), paramTys.begin(), paramTys.end());
 	frameFields.insert(frameFields.end(), localTys.begin(), localTys.end());
-	frameInfo->frameTy->setBody(frameFields, /*isPacked=*/false);
+	frameTy->setBody(frameFields, /*isPacked=*/false);
 	
 	/* Create LLVM function type */
 	const auto* funcTy = static_cast<const FuncType*>(funcSym->getType().get());
@@ -90,13 +90,13 @@ void LLVMCodegen::gen(FuncDef& n) {
 		genCtx.bindFunction(funcSym, llvmFunc);
 	}
 
-	frameInfo->llvmFunc = llvmFunc;
+	frameInfo->setLLVMFunction(llvmFunc);
 
 	/* Create LLVM function basic block and set insertion point */
 	auto* entry = llvm::BasicBlock::Create(genCtx.llvmContext(), funcSym->getName() + ".entry", llvmFunc);
 	genCtx.builder().SetInsertPoint(entry);
 	/* Put allocas for frame and bind frame pointer */
-	llvm::Value* framePtr = genCtx.builder().CreateAlloca(frameInfo->frameTy, nullptr, funcSym->getName() + ".frame");
+	llvm::Value* framePtr = genCtx.builder().CreateAlloca(frameTy, nullptr, funcSym->getName() + ".frame");
 
 	genCtx.enterFunction(funcSym, frameInfo, framePtr);
 	
@@ -107,22 +107,22 @@ void LLVMCodegen::gen(FuncDef& n) {
 		// bind static link
 		argIt->setName("staticlink.arg");
 		llvm::Value* staticLinkArg = &*argIt++;
-		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr, 0, "staticlink.ptr");
+		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr, 0, "staticlink.ptr");
 		genCtx.builder().CreateStore(staticLinkArg, staticLinkPtr);
 	} else {
 		// no static link, bind null
-		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr, 0, "staticlink.ptr");
+		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr, 0, "staticlink.ptr");
 		llvm::Value* nullPtr = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(staticLinkTy));		
 		genCtx.builder().CreateStore(nullPtr, staticLinkPtr);
 	}
 
 	// bind parameters
 	for (const auto& p : funcSym->getParams()) {
-		auto it = frameInfo->capturedVars.find(p.get());
-		assert(it != frameInfo->capturedVars.end());
-		auto idx = it->second;
+		auto idxOpt = frameInfo->getCapturedVarIndex(p.get());
+		assert(idxOpt.has_value());
+		std::size_t idx = *idxOpt;
 		llvm::Value* paramArg = &*argIt++;
-		llvm::Value* paramPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr,
+		llvm::Value* paramPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr,
 																idx, p->getName() + ".ptr");
 		// store parameter into frame (call by value)
 		genCtx.builder().CreateStore(paramArg, paramPtr);
@@ -134,8 +134,10 @@ void LLVMCodegen::gen(FuncDef& n) {
 	for (auto& def : n.localDefs()) {
 		if (auto* var = dynamic_cast<VarDef*>(def.get())) {
 			for (auto* sym : var->symbols()) {
-				llvm::Value* localPtr = genCtx.builder().CreateStructGEP(frameInfo->frameTy, framePtr, 
-															 frameInfo->capturedVars[sym], sym->getName() + ".ptr");
+				auto idxOpt = frameInfo->getCapturedVarIndex(sym);
+				assert(idxOpt.has_value());
+				std::size_t idx = *idxOpt;
+				llvm::Value* localPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr, idx, sym->getName() + ".ptr");
 				genCtx.bindValue(sym, localPtr);
 			}
 		}

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -33,9 +34,19 @@ private:
 		FrameInfo(const Symbol* sym = nullptr, llvm::Function* fn = nullptr,
 			llvm::BasicBlock* entry = nullptr, llvm::StructType* frameType = nullptr);
 
+		void setFunctionSymbol(const Symbol* sym);
+		const Symbol* functionSymbol() const;
+		void setLLVMFunction(llvm::Function* fn);
+		llvm::Function* llvmFunction();
+		const llvm::Function* llvmFunction() const;
+		void setFrameType(llvm::StructType* frameType);
+		llvm::StructType* frameType();
+		llvm::StructType* frameType() const;
+
 		llvm::Value* lookupValue(const Symbol* sym) const;
 		void bindValue(const Symbol* sym, llvm::Value* value);
-		void captureVar(const Symbol* sym, std::size_t index);
+			void captureVar(const Symbol* sym, std::size_t index);
+			std::optional<std::size_t> getCapturedVarIndex(const Symbol* sym) const;
 
 		void pushLoop(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB);
 		void popLoop();
@@ -43,7 +54,6 @@ private:
 		llvm::BasicBlock* currentContinueTarget() const;
 		
 	private:
-		friend class LLVMCodegen; // allow codegen to populate frame layout
 		const Symbol* funcSymbol = nullptr; // function this frame corresponds to
 		llvm::Function* llvmFunc = nullptr; // LLVM function this frame corresponds to
 		llvm::BasicBlock* entryBlock = nullptr; // entry block of the function
