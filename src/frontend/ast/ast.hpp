@@ -474,7 +474,7 @@ private:
 class FuncCall : public Expr {
 public:
     FuncCall(SourceLoc l, string id, vec<up<Expr>> a);
-    Symbol* symbol() const { return symbol_; }
+    const Symbol* symbol() const { return symbol_; }
     void setSymbol(Symbol* sym) { symbol_ = sym; }
     void sem(SemContext& context) override;
     void print(std::ostream& out) const override;

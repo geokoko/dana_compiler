@@ -35,7 +35,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 	std::vector<llvm::Type*> localTys;
 	// build static link field 0
 	llvm::Type* staticLinkTy = parentFrameTy ? llvm::PointerType::getUnqual(parentFrameTy)
-											 : llvm::Type::getInt8PtrTy(genCtx.llvmContext());
+		: llvm::Type::getInt8PtrTy(genCtx.llvmContext());
 	// build parameter and local variable fields
 	std::size_t fieldIndex = 1; // 0 reserved for static link
 
@@ -67,7 +67,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 	frameFields.insert(frameFields.end(), paramTys.begin(), paramTys.end());
 	frameFields.insert(frameFields.end(), localTys.begin(), localTys.end());
 	frameTy->setBody(frameFields, /*isPacked=*/false);
-	
+
 	/* Create LLVM function type */
 	const auto* funcTy = static_cast<const FuncType*>(funcSym->getType().get());
 
@@ -99,10 +99,10 @@ void LLVMCodegen::gen(FuncDef& n) {
 	llvm::Value* framePtr = genCtx.builder().CreateAlloca(frameTy, nullptr, funcSym->getName() + ".frame");
 
 	genCtx.enterFunction(funcSym, frameInfo, framePtr);
-	
+
 	/* Bind static link and parameters to frame fields */
 	auto argIt = llvmFunc->arg_begin();
-	
+
 	if (funcSym->definingFunc()) {
 		// bind static link
 		argIt->setName("staticlink.arg");
@@ -123,7 +123,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 		std::size_t idx = *idxOpt;
 		llvm::Value* paramArg = &*argIt++;
 		llvm::Value* paramPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr,
-																idx, p->getName() + ".ptr");
+														   idx, p->getName() + ".ptr");
 		// store parameter into frame (call by value)
 		genCtx.builder().CreateStore(paramArg, paramPtr);
 		genCtx.bindValue(p.get(), paramPtr);
@@ -170,11 +170,13 @@ void LLVMCodegen::gen(Block& n) {
 void LLVMCodegen::gen(SkipStmt& n) {
 	// no-op statement: do nothing
 	(void)n;
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(ExitStmt& n) {
 	// Exit from a procedure: emit a void return
 	genCtx.builder().CreateRetVoid();
+	value = nullptr;
 }
 
 void LLVMCodegen::gen(AssignStmt& n) {
@@ -185,6 +187,7 @@ void LLVMCodegen::gen(AssignStmt& n) {
 		rhs->agen(*this);
 		rhsValue = value;
 	}
+
 	if (auto* lhs = n.left()) {
 		lhs->agen(*this);
 		lhsAddress = value;
@@ -193,6 +196,7 @@ void LLVMCodegen::gen(AssignStmt& n) {
 	if (rhsValue && lhsAddress) {
 		genCtx.builder().CreateStore(rhsValue, lhsAddress);
 	}
+
 	value = nullptr;
 }
 
@@ -202,15 +206,18 @@ void LLVMCodegen::gen(ReturnStmt& n) {
 		value = nullptr;
 		return;
 	}
+
 	auto* fnSym = genCtx.currentFunc();
 	auto* sig = static_cast<const FuncType*>(fnSym->getType().get());
 	auto* retTy = sig ? genCtx.getLLVMType(*sig->returnType()) : genCtx.builder().getVoidTy();
 
-		if (auto* expr = n.returnValue()) {
-			expr->agen(*this);
-			auto* v = value;
-			genCtx.builder().CreateRet(v ? v : llvm::UndefValue::get(retTy));
-	} else {
+	if (auto* expr = n.returnValue()) {
+		expr->agen(*this);
+		// expression evaluated to 'value'
+		auto* v = value;
+		genCtx.builder().CreateRet(v ? v : llvm::UndefValue::get(retTy));
+	} 
+	else {
 		if (retTy->isVoidTy()) genCtx.builder().CreateRetVoid();
 		else genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
 	}
@@ -303,8 +310,13 @@ void LLVMCodegen::gen(ParenExpr& n) {
 }
 
 void LLVMCodegen::gen(FuncCall& n) {
-	(void)n;
-	value = nullptr;
+	const Symbol* calleeSym = n.symbol();
+	llvm::Function* callee = genCtx.lookupFunction(static_cast<const FuncSymbol*>(calleeSym));
+
+	std::vector<llvm::Value*> args;
+	// get static link (if it exists)
+	if (calleeSym->definingFunc()) {
+		
 }
 
 void LLVMCodegen::gen(UnaryExpr& n) {

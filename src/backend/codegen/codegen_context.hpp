@@ -24,9 +24,9 @@
 
 class CodegenContext {
 private:
-    std::unique_ptr<llvm::LLVMContext> ownedCtx_;
-    std::unique_ptr<llvm::Module> module_;
-    std::unique_ptr<llvm::IRBuilder<>> builder_;
+	std::unique_ptr<llvm::LLVMContext> ownedCtx_;
+	std::unique_ptr<llvm::Module> module_;
+	std::unique_ptr<llvm::IRBuilder<>> builder_;
 
 	/* Frame logic */
 	class FrameInfo {
@@ -45,27 +45,27 @@ private:
 
 		llvm::Value* lookupValue(const Symbol* sym) const;
 		void bindValue(const Symbol* sym, llvm::Value* value);
-			void captureVar(const Symbol* sym, std::size_t index);
-			std::optional<std::size_t> getCapturedVarIndex(const Symbol* sym) const;
+		void captureVar(const Symbol* sym, std::size_t index);
+		std::optional<std::size_t> getCapturedVarIndex(const Symbol* sym) const;
 
 		void pushLoop(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB);
 		void popLoop();
 		llvm::BasicBlock* currentBreakTarget() const;
 		llvm::BasicBlock* currentContinueTarget() const;
-		
+
 	private:
 		const Symbol* funcSymbol = nullptr; // function this frame corresponds to
 		llvm::Function* llvmFunc = nullptr; // LLVM function this frame corresponds to
 		llvm::BasicBlock* entryBlock = nullptr; // entry block of the function
 		llvm::StructType* frameTy = nullptr; // LLVM struct type representing the frame layout
-    	std::unordered_map<const Symbol*, llvm::Value*> valueMap_;
-    	std::unordered_map<const Symbol*, std::size_t> capturedVars; 
-    	std::vector<llvm::BasicBlock*> breakTargets;
-    	std::vector<llvm::BasicBlock*> continueTargets;
-    	llvm::AllocaInst* returnSlot = nullptr;
+		std::unordered_map<const Symbol*, llvm::Value*> valueMap_;
+		std::unordered_map<const Symbol*, std::size_t> capturedVars; 
+		std::vector<llvm::BasicBlock*> breakTargets;
+		std::vector<llvm::BasicBlock*> continueTargets;
+		llvm::AllocaInst* returnSlot = nullptr;
 	};
 
-    /* Mapping of Dana symbols to LLVM entities */
+	/* Mapping of Dana symbols to LLVM entities */
 	std::unordered_map<const FuncSymbol*, llvm::Function*> functionMap_;
 	// Frame information per function
 	std::unordered_map<const FuncSymbol*, FrameInfo> frameMap_;
@@ -74,22 +74,22 @@ private:
 	FrameInfo* currentFrameInfo_ = nullptr;
 
 public:
-    // Constructor of LLVMContext
-    explicit CodegenContext(const std::string& moduleName);
-   
+	// Constructor of LLVMContext
+	explicit CodegenContext(const std::string& moduleName);
+
 	// Getters of LLVM core objects
-    llvm::LLVMContext& llvmContext() { return *ownedCtx_; }
-    const llvm::LLVMContext& llvmContext() const { return *ownedCtx_; }
-    llvm::Module& llvmModule()       { return *module_; }
-    const llvm::Module& llvmModule() const { return *module_; }
-    llvm::IRBuilder<>& builder()     { return *builder_; }
-    const llvm::IRBuilder<>& builder() const { return *builder_; }
-    
+	llvm::LLVMContext& llvmContext() { return *ownedCtx_; }
+	const llvm::LLVMContext& llvmContext() const { return *ownedCtx_; }
+	llvm::Module& llvmModule()       { return *module_; }
+	const llvm::Module& llvmModule() const { return *module_; }
+	llvm::IRBuilder<>& builder()     { return *builder_; }
+	const llvm::IRBuilder<>& builder() const { return *builder_; }
+
 	/* Dana Symbol to LLVM value translation */
-    llvm::Value* lookupValue(const Symbol* sym) const;
-    void bindValue(const Symbol* sym, llvm::Value* value);
-    llvm::Function* lookupFunction(const FuncSymbol* sym) const;
-    void bindFunction(const FuncSymbol* sym, llvm::Function* fn);
+	llvm::Value* lookupValue(const Symbol* sym) const;
+	void bindValue(const Symbol* sym, llvm::Value* value);
+	llvm::Function* lookupFunction(const FuncSymbol* sym) const;
+	void bindFunction(const FuncSymbol* sym, llvm::Function* fn);
 	void pushLoopTargets(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB);
 	void popLoopTargets();
 	llvm::BasicBlock* currentBreakTarget() const;
@@ -99,8 +99,8 @@ public:
 	 * Type translation to an LLVM type. 
 	 * If forParam is true, unsized arrays/by-ref params decay to pointers.
 	 * */
-    llvm::Type* getLLVMType(const SemaType& ty, bool forParam = false);
-	
+	llvm::Type* getLLVMType(const SemaType& ty, bool forParam = false);
+
 	// Track the function currently being generated and its frame pointer.
 	void enterFunction(const FuncSymbol* fn, FrameInfo* frameInfo, llvm::Value* framePtr);
 	void leaveFunction();
