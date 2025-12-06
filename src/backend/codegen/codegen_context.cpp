@@ -7,7 +7,7 @@ CodegenContext::CodegenContext(const std::string& moduleName) {
 }
 
 CodegenContext::FrameInfo::FrameInfo(const Symbol* sym, llvm::Function* fn, llvm::BasicBlock* entry, llvm::StructType* frameType)
-								: funcSymbol(sym), llvmFunc(fn), entryBlock(entry), frameTy(frameType) {}
+: funcSymbol(sym), llvmFunc(fn), entryBlock(entry), frameTy(frameType) {}
 
 void CodegenContext::FrameInfo::setFunctionSymbol(const Symbol* sym) {
 	funcSymbol = sym;
@@ -31,10 +31,6 @@ const llvm::Function* CodegenContext::FrameInfo::llvmFunction() const {
 
 void CodegenContext::FrameInfo::setFrameType(llvm::StructType* frameType) {
 	frameTy = frameType;
-}
-
-llvm::StructType* CodegenContext::FrameInfo::frameType() {
-	return frameTy;
 }
 
 llvm::StructType* CodegenContext::FrameInfo::frameType() const {
