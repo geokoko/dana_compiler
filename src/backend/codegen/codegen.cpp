@@ -1,5 +1,6 @@
 #include "codegen.hpp"
 
+#include <cassert>
 #include <memory>
 #include <vector>
 
@@ -225,7 +226,71 @@ void LLVMCodegen::gen(ReturnStmt& n) {
 }
 
 void LLVMCodegen::gen(ProcCall& n) {
-	(void)n;
+	value = nullptr;
+	auto* calleeSym = static_cast<FuncSymbol*>(n.symbol());
+	if (!calleeSym) {
+		return;
+	}
+	llvm::Function* callee = genCtx.lookupFunction(calleeSym);
+	if (!callee) {
+		return;
+	}
+
+	auto* fnTy = callee->getFunctionType();
+	std::vector<llvm::Value*> callArgs;
+	callArgs.reserve(fnTy->getNumParams());
+
+	unsigned paramIndex = 0;
+	// build callee's static link if needed
+	if (const auto* definingFunc = calleeSym->definingFunc()) {
+		assert(fnTy->getNumParams() > 0 && "Nested procedure missing static link parameter");
+		llvm::Value* linkPtr = genCtx.currentFramePtr();
+		const FuncSymbol* i = genCtx.currentFunc();
+
+		// walk up frames to find defining function's frame
+		while (i && i != definingFunc && linkPtr) {
+			const auto* info = genCtx.getFrameInfo(i);
+			if (!info || !info->frameType()) {
+				linkPtr = nullptr;
+				break;
+			}
+			auto* parentSlot = genCtx.builder().CreateStructGEP(info->frameType(), linkPtr, 0);
+			linkPtr = genCtx.builder().CreateLoad(parentSlot->getType()->getPointerElementType(), parentSlot);
+			
+			i = i->definingFunc();
+		}
+
+		llvm::Type* staticLinkTy = fnTy->getParamType(paramIndex++);
+		auto* staticLinkPtrTy = llvm::cast<llvm::PointerType>(staticLinkTy);
+
+		llvm::Value* staticLink = nullptr;
+		if (linkPtr) {
+			staticLink = genCtx.builder().CreateBitCast(linkPtr, staticLinkTy);
+		} else {
+			staticLink = llvm::ConstantPointerNull::get(staticLinkPtrTy);
+		}
+
+		// add static link to call arguments (slot 0)
+		callArgs.push_back(staticLink);
+	}
+
+	const auto& args = n.arguments();
+	for (std::size_t i = 0; i < args.size(); ++i) {
+		auto* expr = args[i].get();
+		if (!expr) {
+			std::cout << "Invalid null argument in procedure call to " << calleeSym->getName() << "\n";
+			value = nullptr;
+			return;
+		}
+		// generate argument
+		expr->agen(*this);
+
+		llvm::Type* paramTy = fnTy->getParamType(paramIndex++);
+		llvm::Value* argVal = llvm::UndefValue::get(paramTy);
+		callArgs.push_back(argVal);
+	}
+
+	genCtx.builder().CreateCall(callee, callArgs);
 	value = nullptr;
 }
 
@@ -310,13 +375,64 @@ void LLVMCodegen::gen(ParenExpr& n) {
 }
 
 void LLVMCodegen::gen(FuncCall& n) {
-	const Symbol* calleeSym = n.symbol();
-	llvm::Function* callee = genCtx.lookupFunction(static_cast<const FuncSymbol*>(calleeSym));
+	value = nullptr;
+	const auto* calleeSym = static_cast<const FuncSymbol*>(n.symbol());
+	if (!calleeSym) {
+		return;
+	}
 
-	std::vector<llvm::Value*> args;
-	// get static link (if it exists)
-	if (calleeSym->definingFunc()) {
-		
+	llvm::Function* calleeFn = genCtx.lookupFunction(calleeSym);
+	if (!calleeFn) {
+		return;
+	}
+
+	auto* fnTy = calleeFn->getFunctionType();
+	std::vector<llvm::Value*> callArgs;
+	callArgs.reserve(fnTy->getNumParams());
+
+	unsigned paramIndex = 0;
+	if (const auto* definingFunc = calleeSym->definingFunc()) {
+		assert(fnTy->getNumParams() > 0 && "Nested function missing static link parameter");
+		llvm::Value* linkPtr = genCtx.currentFramePtr();
+		const FuncSymbol* i = genCtx.currentFunc();
+
+		while (i && i != definingFunc && linkPtr) {
+			const auto* info = genCtx.getFrameInfo(i);
+			if (!info || !info->frameType()) {
+				linkPtr = nullptr;
+				break;
+			}
+			auto* parentSlot = genCtx.builder().CreateStructGEP(info->frameType(), linkPtr, 0);
+			linkPtr = genCtx.builder().CreateLoad(parentSlot->getType()->getPointerElementType(), parentSlot);
+			i = i->definingFunc();
+		}
+
+		llvm::Type* staticLinkTy = fnTy->getParamType(paramIndex++);
+		auto* staticLinkPtrTy = llvm::cast<llvm::PointerType>(staticLinkTy);
+		llvm::Value* staticLink = nullptr;
+		if (linkPtr) {
+			staticLink = genCtx.builder().CreateBitCast(linkPtr, staticLinkTy);
+		} else {
+			staticLink = llvm::ConstantPointerNull::get(staticLinkPtrTy);
+		}
+		callArgs.push_back(staticLink);
+	}
+
+	const auto& args = n.arguments();
+	for (std::size_t i = 0; i < args.size(); ++i) {
+		auto* expr = args[i].get();
+		if (expr) {
+			expr->agen(*this);
+		} else {
+			value = nullptr;
+		}
+		llvm::Type* paramTy = fnTy->getParamType(paramIndex);
+		llvm::Value* argVal = llvm::UndefValue::get(paramTy);
+		callArgs.push_back(argVal);
+		++paramIndex;
+	}
+
+	value = genCtx.builder().CreateCall(calleeFn, callArgs);
 }
 
 void LLVMCodegen::gen(UnaryExpr& n) {
