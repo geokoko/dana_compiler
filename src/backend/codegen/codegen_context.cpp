@@ -6,40 +6,16 @@ CodegenContext::CodegenContext(const std::string& moduleName) {
 	builder_ = std::make_unique<llvm::IRBuilder<>>(*ownedCtx_);
 }
 
-CodegenContext::FrameInfo::FrameInfo(const Symbol* sym, llvm::Function* fn, llvm::BasicBlock* entry, llvm::StructType* frameType)
-: funcSymbol(sym), llvmFunc(fn), entryBlock(entry), frameTy(frameType) {}
-
-void CodegenContext::FrameInfo::setFunctionSymbol(const Symbol* sym) {
-	funcSymbol = sym;
-}
-
-const Symbol* CodegenContext::FrameInfo::functionSymbol() const {
-	return funcSymbol;
-}
-
-void CodegenContext::FrameInfo::setLLVMFunction(llvm::Function* fn) {
-	llvmFunc = fn;
-}
-
-llvm::Function* CodegenContext::FrameInfo::llvmFunction() {
-	return llvmFunc;
-}
-
-const llvm::Function* CodegenContext::FrameInfo::llvmFunction() const {
-	return llvmFunc;
-}
-
 void CodegenContext::FrameInfo::setFrameType(llvm::StructType* frameType) {
 	frameTy = frameType;
 }
 
-llvm::StructType* CodegenContext::FrameInfo::frameType() const {
+llvm::StructType* CodegenContext::FrameInfo::getFrameType() {
 	return frameTy;
 }
 
-llvm::Value* CodegenContext::FrameInfo::lookupValue(const Symbol* sym) const {
-	auto it = valueMap_.find(sym);
-	return it == valueMap_.end() ? nullptr : it->second;
+llvm::StructType* CodegenContext::FrameInfo::getFrameType() const {
+	return frameTy;
 }
 
 void CodegenContext::FrameInfo::bindValue(const Symbol* sym, llvm::Value* value) {
@@ -63,21 +39,6 @@ std::optional<std::size_t> CodegenContext::FrameInfo::getCapturedVarIndex(const 
 	return it->second;
 }
 
-llvm::Value* CodegenContext::lookupValue(const Symbol* sym) const {
-	if (!sym || !currentFunc_) {
-		return nullptr;
-	}
-	const auto* fi = getFrameInfo(currentFunc_);
-	return fi ? fi->FrameInfo::lookupValue(sym) : nullptr;
-}
-
-void CodegenContext::bindValue(const Symbol* sym, llvm::Value* value) {
-	if (!sym || !currentFrameInfo_) {
-		return;
-	}
-	currentFrameInfo_->bindValue(sym, value);
-}
-
 llvm::Function* CodegenContext::lookupFunction(const FuncSymbol* sym) const {
 	auto it = functionMap_.find(sym);
 	return it == functionMap_.end() ? nullptr : it->second;
@@ -88,23 +49,26 @@ void CodegenContext::bindFunction(const FuncSymbol* sym, llvm::Function* fn) {
 	functionMap_[sym] = fn;
 }
 
-void CodegenContext::pushLoopTargets(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB) {
-	if (!currentFrameInfo_) {
-		return;
-	}
-	currentFrameInfo_->pushLoop(breakBB, continueBB);
-}
-
-void CodegenContext::popLoopTargets() {
-	if (!currentFrameInfo_) {
-		return;
-	}
-	currentFrameInfo_->popLoop();
-}
-
 void CodegenContext::FrameInfo::pushLoop(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB) {
 	breakTargets.push_back(breakBB);
 	continueTargets.push_back(continueBB);
+}
+
+void CodegenContext::FrameInfo::popLoop() {
+	if (!breakTargets.empty()) {
+		breakTargets.pop_back();
+	}
+	if (!continueTargets.empty()) {
+		continueTargets.pop_back();
+	}
+}
+
+llvm::BasicBlock* CodegenContext::FrameInfo::currentBreakTarget() const {
+	return breakTargets.empty() ? nullptr : breakTargets.back();
+}
+
+llvm::BasicBlock* CodegenContext::FrameInfo::currentContinueTarget() const {
+	return continueTargets.empty() ? nullptr : continueTargets.back();
 }
 
 llvm::Type* CodegenContext::getLLVMType(const SemaType& ty, bool forParam) {
@@ -125,15 +89,17 @@ llvm::Type* CodegenContext::getLLVMType(const SemaType& ty, bool forParam) {
 
 			auto* elemTy = getLLVMType(*elem, /*forParam=*/false);
 
-			// Unsized arrays decay to pointers (primarily for parameters)
+			// Unsized arrays decay to opaque pointers (primarily for parameters)
 			if (!arrTy.size()) {
-				return llvm::PointerType::get(elemTy, 0);
+				return llvm::PointerType::get(llvmContext(), 0);
 			}
 
 			auto* llvmArrTy = llvm::ArrayType::get(elemTy, *arrTy.size());
-			return forParam ? llvm::PointerType::get(llvmArrTy, 0) : llvmArrTy;
+			return forParam ? static_cast<llvm::Type*>(llvm::PointerType::get(llvmContext(), 0)) 
+							: static_cast<llvm::Type*>(llvmArrTy);
 		}
 		case SemaType::TypeKind::FUNC: {
+			forParam = false; // function types never decay
 			const auto& fnTy = static_cast<const FuncType&>(ty);
 			std::vector<llvm::Type*> paramTypes;
 			paramTypes.reserve(fnTy.params().size());
@@ -147,7 +113,7 @@ llvm::Type* CodegenContext::getLLVMType(const SemaType& ty, bool forParam) {
 			auto* retTy = fnTy.returnType() ? getLLVMType(*fnTy.returnType(), /*forParam=*/false)
 				: llvm::Type::getVoidTy(llvmContext());
 			auto* llvmFnTy = llvm::FunctionType::get(retTy, paramTypes, /*isVarArg=*/false);
-			return forParam ? llvm::PointerType::get(llvmFnTy, 0) : llvmFnTy;
+			return llvmFnTy;
 		}
 	}
 	return nullptr;
@@ -157,29 +123,93 @@ CodegenContext::FrameInfo* CodegenContext::createFrameInfo(const FuncSymbol* fn)
 	if (!fn) {
 		return nullptr;
 	}
-	auto [it, _] = frameMap_.try_emplace(fn);
-	return &it->second;
+	auto [it, inserted] = frameMap_.try_emplace(fn);
+	if (inserted || !it->second) {
+		it->second = std::make_unique<FrameInfo>();
+	}
+	return it->second.get();
 }
 
 const CodegenContext::FrameInfo* CodegenContext::getFrameInfo(const FuncSymbol* fn) const {
 	auto it = frameMap_.find(fn);
-	return it == frameMap_.end() ? nullptr : &it->second;
+	return it == frameMap_.end() ? nullptr : it->second.get();
 }
 
-void CodegenContext::enterFunction(const FuncSymbol* fn, FrameInfo* frameInfo, llvm::Value* framePtr) {
+llvm::Value* CodegenContext::lookupValue(const Symbol* sym) {
+	if (!sym || !currentFunc_) {
+		return nullptr;
+	}
+	const FuncSymbol* targetFn = sym->definingFunc();
+	const FuncSymbol* walker = currentFunc_;
+	llvm::Value* framePtr = currentFramePtr_;
+	const FrameInfo* frameInfo = currentFrameInfo();
+
+	// Walk up the static link chain to find the frame that captures the variable
+	while (walker && walker != targetFn && framePtr && frameInfo) {
+		auto* frameTy = frameInfo->getFrameType();
+		if (!frameTy) {
+			return nullptr;
+		}
+		auto* parentSlot = builder().CreateStructGEP(frameTy, framePtr, 0, "staticlink.slot");
+		llvm::Type* parentTy = frameTy->getElementType(0);
+		framePtr = builder().CreateLoad(parentTy, parentSlot, "staticlink.up");
+		walker = walker->definingFunc();
+		frameInfo = walker ? getFrameInfo(walker) : nullptr;
+	}
+
+	if (!frameInfo || !framePtr) {
+		return nullptr;
+	}
+
+	auto idxOpt = frameInfo->getCapturedVarIndex(sym);
+	if (!idxOpt.has_value()) {
+		return nullptr;
+	}
+
+	// For captured variables, get the slot from the frame
+	auto* targetFrameTy = frameInfo->getFrameType();
+	unsigned idx = *idxOpt;
+	llvm::Value* slotPtr = builder().CreateStructGEP(targetFrameTy, framePtr, idx, sym->getName() + ".slot");
+
+	// For by-ref parameters, load the pointer stored in the slot
+	if (sym->getKind() == Symbol::SymKind::PARAM) {
+        const auto* paramSym = static_cast<const ParamSymbol*>(sym);
+
+        if (paramSym->getPass() == Symbol::ParamPass::BY_REF) {
+            llvm::Type* slotTy = targetFrameTy->getElementType(idx);
+            return builder().CreateLoad(slotTy, slotPtr, sym->getName() + ".byref");
+        }
+    }
+
+	return slotPtr;
+}
+
+void CodegenContext::enterFunction(const FuncSymbol* fn, llvm::Value* framePtr) {
+	if (currentFunc_ || currentFramePtr_) {
+		frameStack_.emplace_back(currentFunc_, currentFramePtr_);
+	}
 	currentFunc_ = fn;
-	currentFrameInfo_ = frameInfo;
 	currentFramePtr_ = framePtr;
 }
 
 void CodegenContext::leaveFunction() {
-	currentFunc_ = nullptr;
-	currentFramePtr_ = nullptr;
-	currentFrameInfo_ = nullptr;
+	if (!frameStack_.empty()) {
+		auto prev = frameStack_.back();
+		frameStack_.pop_back();
+		currentFunc_ = prev.first;
+		currentFramePtr_ = prev.second;
+	} else {
+		currentFunc_ = nullptr;
+		currentFramePtr_ = nullptr;
+	}
 }
 
 const FuncSymbol* CodegenContext::currentFunc() const {
 	return currentFunc_;
+}
+
+const CodegenContext::FrameInfo* CodegenContext::currentFrameInfo() const {
+	return currentFunc_ ? getFrameInfo(currentFunc_) : nullptr;
 }
 
 llvm::Value* CodegenContext::currentFramePtr() const {
