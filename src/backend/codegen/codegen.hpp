@@ -18,7 +18,13 @@ public:
 	virtual ~Codegen() = default;
 
 	// Top-level
+	virtual void gen(Type&) = 0;
+	virtual void gen(FParType&) = 0;
 	virtual void gen(Program&) = 0;
+	virtual void gen(FParDef&) = 0;
+	virtual void gen(Header&) = 0;
+	virtual void gen(VarDef&) = 0;
+	virtual void gen(FuncDecl&) = 0;
 	virtual void gen(FuncDef&) = 0;
 	virtual void gen(Block&) = 0;
 
@@ -56,10 +62,16 @@ public:
 // Concrete LLVM codegen visitor
 class LLVMCodegen : public Codegen {
 public:
-	explicit LLVMCodegen(CodegenContext& ctx) : genCtx(ctx) {}
+	explicit LLVMCodegen(CodegenContext& ctx) : genCtx(ctx) { value = nullptr; }
 
 	// Top level
+	void gen(Type& n) override;
+	void gen(FParType& n) override;
 	void gen(Program& n) override;
+	void gen(FParDef& n) override;
+	void gen(Header& n) override;
+	void gen(VarDef& n) override;
+	void gen(FuncDecl& n) override;
 	void gen(FuncDef& n) override;
 	void gen(Block& n) override;
 
@@ -94,9 +106,11 @@ public:
 	void gen(RelCond& n) override;
 
 	// Result of the most recently evaluated expression is stored here. For voids, set to nullptr.
-	llvm::Value* value = nullptr;
+	llvm::Value* value; 
 
 private:
 	CodegenContext& genCtx;
+	// Helper to generate parameter initialization code for function calls
+	llvm::Value* parameterInit(const FuncSymbol* calleeSym, const vec<up<Expr>>& args);
 
 };
