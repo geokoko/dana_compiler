@@ -135,6 +135,11 @@ CodegenContext::FrameInfo* CodegenContext::createFrameInfo(const FuncSymbol* fn)
 	return it->second.get();
 }
 
+FrameInfo* CodegenContext::getFrameInfo(FuncSymbol* f) {
+    auto it = frameMap_.find(f);
+    return it != frameMap_.end() ? it->second.get() : nullptr;
+}
+
 const CodegenContext::FrameInfo* CodegenContext::getFrameInfo(const FuncSymbol* fn) const {
 	auto it = frameMap_.find(fn);
 	return it == frameMap_.end() ? nullptr : it->second.get();
