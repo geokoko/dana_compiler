@@ -24,4 +24,5 @@ public:
 
 private:
 	std::vector<std::unique_ptr<Scope>> scopes_;
+	std::vector<std::unique_ptr<Symbol>> symbols_; // To own all declared symbols
 };

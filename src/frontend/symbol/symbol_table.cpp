@@ -30,7 +30,13 @@ LookupResult SymbolTable::lookup(const std::string& id) const {
 }
 
 InsertResult SymbolTable::declare(std::unique_ptr<Symbol> symbol) {
-	return current().declare(std::move(symbol));
+	if (!symbol) {
+		return {};
+	}
+	// Store symbol to maintain ownership
+	symbols_.push_back(std::move(symbol));
+	// Pass raw pointer to Scope
+	return current().declare(symbol.get());
 }
 
 std::size_t SymbolTable::depth() const {
