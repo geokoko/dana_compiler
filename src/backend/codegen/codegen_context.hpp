@@ -96,6 +96,7 @@ public:
 	/* Dana Symbol to LLVM value translation */
 	llvm::Value* lookupValue(const Symbol* sym);
 	llvm::Function* lookupFunction(const FuncSymbol* sym) const;
+	llvm::Function* getLLVMFunction(const FuncSymbol* fn);
 	void bindFunction(const FuncSymbol* sym, llvm::Function* fn);
 
 	// Track the function currently being generated and its frame pointer.
