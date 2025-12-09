@@ -33,10 +33,12 @@ InsertResult SymbolTable::declare(std::unique_ptr<Symbol> symbol) {
 	if (!symbol) {
 		return {};
 	}
+	// Keep raw pointer before transferring ownership so we can insert into the current scope.
+	Symbol* raw = symbol.get();
 	// Store symbol to maintain ownership
 	symbols_.push_back(std::move(symbol));
 	// Pass raw pointer to Scope
-	return current().declare(symbol.get());
+	return current().declare(raw);
 }
 
 std::size_t SymbolTable::depth() const {
