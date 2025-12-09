@@ -12,10 +12,8 @@
 
 namespace {
 
-/* Converts the frontend DataType enum to the corresponding semantic type */
-SemaTypePtr scalarType(DataType dt) {
-	return dt == DataType::INT ? makeIntType() : makeByteType();
-}
+// Forward declaration for recursive compatibility checks
+bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
 
 /* Compares two semantic types for equality */
 bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
@@ -25,13 +23,13 @@ bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
 	if (!a || !b) {
 		return false;
 	}
-
-	// check type structure equality
 	return a->equals(*b);
 }
 
-// Forward declaration for recursive compatibility checks
-bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
+/* Converts the frontend DataType enum to the corresponding semantic type */
+SemaTypePtr scalarType(DataType dt) {
+	return dt == DataType::INT ? makeIntType() : makeByteType();
+}
 
 // Checks compatibility of array types, allowing sized actuals for unsized parameters
 bool arrayTypesCompatible(const ArrayType* actualArr, const ArrayType* expectedArr) {
@@ -71,7 +69,7 @@ bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected) {
 	}
 
 	// For non-array types, fall back to structural equality
-	return actual->equals(*expected);
+	return typesEqual(actual, expected);
 }
 
 /* Converts a semantic type to its string representation for diagnostics */
