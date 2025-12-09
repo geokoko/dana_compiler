@@ -57,7 +57,12 @@ InsertResult SemContext::declareSymbol(std::unique_ptr<Symbol> symbol, bool repo
     auto result = symtab_.declare(std::move(symbol));
 
     if (!result.inserted && reportDuplicates) {
-        diags_.error(loc, "symbol '" + attemptedName + "' already declared in this scope");
+        diags_.report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
+                      loc, "symbol '" + attemptedName + "' already declared in this scope");
+        if (result.symbol) {
+            diags_.report(Diagnostics::Severity::Note, Diagnostics::Phase::Semantic,
+                          result.symbol->getLocation(), "previous declaration is here");
+        }
     }
 
     return result;
@@ -104,15 +109,19 @@ bool SemContext::hasLoopLabel(const std::string& label) const {
 	return false;
 }
 
-void SemContext::setHeaderInfo(HeaderInfo info) {
-	pendingHeader_ = std::move(info);
-}
-
-std::optional<SemContext::HeaderInfo> SemContext::takeHeaderInfo() {
-	if (!pendingHeader_) {
-		return std::nullopt;
+std::unique_ptr<Symbol> SemContext::makeFunctionSymbol(const SemContext::HeaderInfo& info) {
+	std::vector<SemaTypePtr> paramTypes;
+	paramTypes.reserve(info.params.size());
+	for (const auto& param : info.params) {
+		paramTypes.push_back(param.type);
 	}
-	auto result = std::move(*pendingHeader_);
-	pendingHeader_.reset();
-	return result;
+	auto sig = makeFuncType(info.returnType, std::move(paramTypes));
+	auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
+	func->clearParams();
+	for (const auto& param : info.params) {
+		auto p = std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
+		p->setDefiningFunc(func.get());
+		func->addParam(std::move(p));
+	}
+	return func;
 }
