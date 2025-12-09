@@ -73,48 +73,6 @@ void LLVMCodegen::gen(ReturnStmt& n) {
 	value = nullptr;
 }
 
-/* ========== Break / Continue ========== */
-
-void LLVMCodegen::gen(BreakStmt& n) {
-	(void)n;
-	auto* frameInfo   = genCtx.currentFrameInfo();
-	auto* breakTarget = frameInfo ? frameInfo->currentBreakTarget() : nullptr;
-	if (!breakTarget) {
-		value = nullptr;
-		return;
-	}
-	auto* currentBB  = genCtx.builder().GetInsertBlock();
-	auto* parentFn   = currentBB ? currentBB->getParent() : nullptr;
-
-	genCtx.builder().CreateBr(breakTarget);
-	if (parentFn) {
-		auto* contBB = llvm::BasicBlock::Create(
-			genCtx.llvmContext(), "break.cont", parentFn);
-		genCtx.builder().SetInsertPoint(contBB);
-	}
-	value = nullptr;
-}
-
-void LLVMCodegen::gen(ContinueStmt& n) {
-	(void)n;
-	auto* frameInfo      = genCtx.currentFrameInfo();
-	auto* continueTarget = frameInfo ? frameInfo->currentContinueTarget() : nullptr;
-	if (!continueTarget) {
-		value = nullptr;
-		return;
-	}
-	auto* currentBB  = genCtx.builder().GetInsertBlock();
-	auto* parentFn   = currentBB ? currentBB->getParent() : nullptr;
-
-	genCtx.builder().CreateBr(continueTarget);
-	if (parentFn) {
-		auto* contBB = llvm::BasicBlock::Create(
-			genCtx.llvmContext(), "continue.cont", parentFn);
-		genCtx.builder().SetInsertPoint(contBB);
-	}
-	value = nullptr;
-}
-
 /* ========== If / else chain ========== */
 
 void LLVMCodegen::gen(IfStmt& n) {
@@ -207,5 +165,4 @@ void LLVMCodegen::gen(IfStmt& n) {
 	genCtx.builder().SetInsertPoint(mergeBB);
 	value = nullptr;
 }
-
 
