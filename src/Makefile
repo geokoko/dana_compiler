@@ -1,8 +1,9 @@
 # Compiler settings
+# using g++ as the C++ compiler, with C++17 standard
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -g
 
-# LLVM flags
+# LLVM flags (using llvm 18)
 LLVM_CONFIG = llvm-config-18
 # Compile C++ using LLVM
 LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags)
@@ -55,7 +56,14 @@ SRCS := main.cpp \
         $(SYMBOL_DIR)/symbol_table.cpp \
         $(SYMBOL_DIR)/scope.cpp \
         $(SYMBOL_DIR)/sematype.cpp \
-		$(BACKEND_DIR)/codegen.cpp \
+		$(BACKEND_DIR)/codegen/codegen_context.cpp \
+		$(BACKEND_DIR)/codegen/codegen_cond.cpp \
+		$(BACKEND_DIR)/codegen/codegen_expr.cpp \
+		$(BACKEND_DIR)/codegen/codegen_stmt.cpp \
+		$(BACKEND_DIR)/codegen/codegen_decl.cpp \
+		$(BACKEND_DIR)/codegen/codegen_loop.cpp \
+		$(BACKEND_DIR)/codegen/codegen_call.cpp \
+		$(RUNTIME_DIR)/danalib.cpp \
         $(PARSER_CPP) \
         $(LEXER_CPP)
 # object files
