@@ -18,11 +18,6 @@ llvm::StructType* CodegenContext::FrameInfo::getFrameType() const {
 	return frameTy;
 }
 
-void CodegenContext::FrameInfo::bindValue(const Symbol* sym, llvm::Value* value) {
-	if (!sym) return;
-	valueMap_[sym] = value;
-}
-
 void CodegenContext::FrameInfo::captureVar(const Symbol* sym, std::size_t index) {
 	if (!sym) return;
 	capturedVars[sym] = index;
@@ -135,9 +130,9 @@ CodegenContext::FrameInfo* CodegenContext::createFrameInfo(const FuncSymbol* fn)
 	return it->second.get();
 }
 
-FrameInfo* CodegenContext::getFrameInfo(FuncSymbol* f) {
-    auto it = frameMap_.find(f);
-    return it != frameMap_.end() ? it->second.get() : nullptr;
+CodegenContext::FrameInfo* CodegenContext::getFrameInfo(const FuncSymbol* f) {
+	auto it = frameMap_.find(f);
+	return it != frameMap_.end() ? it->second.get() : nullptr;
 }
 
 const CodegenContext::FrameInfo* CodegenContext::getFrameInfo(const FuncSymbol* fn) const {
