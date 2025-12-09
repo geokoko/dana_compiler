@@ -44,6 +44,11 @@ llvm::Function* CodegenContext::lookupFunction(const FuncSymbol* sym) const {
 	return it == functionMap_.end() ? nullptr : it->second;
 }
 
+llvm::Function* CodegenContext::getLLVMFunction(const FuncSymbol* fn) {
+	auto it = functionMap_.find(fn);
+	return it == functionMap_.end() ? nullptr : it->second;
+}
+
 void CodegenContext::bindFunction(const FuncSymbol* sym, llvm::Function* fn) {
 	if (!sym) return;
 	functionMap_[sym] = fn;
@@ -206,6 +211,10 @@ void CodegenContext::leaveFunction() {
 
 const FuncSymbol* CodegenContext::currentFunc() const {
 	return currentFunc_;
+}
+
+CodegenContext::FrameInfo* CodegenContext::currentFrameInfo() {
+	return currentFunc_ ? getFrameInfo(currentFunc_) : nullptr;
 }
 
 const CodegenContext::FrameInfo* CodegenContext::currentFrameInfo() const {

@@ -111,6 +111,6 @@ public:
 private:
 	CodegenContext& genCtx;
 	// Helper to generate parameter initialization code for function calls
-	llvm::Value* parameterInit(const FuncSymbol* calleeSym, const vec<up<Expr>>& args);
+	llvm::Value* makeCall(const FuncSymbol* calleeSym, const vec<up<Expr>>& args);
 
 };
