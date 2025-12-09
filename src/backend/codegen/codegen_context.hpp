@@ -92,6 +92,7 @@ public:
 	/* FrameInfo management */
 	FrameInfo* createFrameInfo(const FuncSymbol* fn);
 	const FrameInfo* getFrameInfo(const FuncSymbol* fn) const;
+	FrameInfo* getFrameInfo(FuncSymbol* fn);
 
 	/* Dana Symbol to LLVM value translation */
 	llvm::Value* lookupValue(const Symbol* sym);
