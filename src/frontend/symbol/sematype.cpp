@@ -105,6 +105,16 @@ bool VoidType::equals(const SemaType& other) const {
     return other.getKind() == TypeKind::VOID;
 }
 
+bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
+    if (a == b) {
+        return true;
+    }
+    if (!a || !b) {
+        return false;
+    }
+    return a->equals(*b);
+}
+
 namespace {
 	template <class T, class... Args>
 	SemaTypePtr makeType(Args&&... args) {
