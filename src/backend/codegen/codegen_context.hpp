@@ -36,7 +36,6 @@ public:
 		llvm::StructType* getFrameType() const;
 
 		/* Symbol to LLVM value mapping */
-		void bindValue(const Symbol* sym, llvm::Value* value);
 		void captureVar(const Symbol* sym, std::size_t index);
 		std::optional<std::size_t> getCapturedVarIndex(const Symbol* sym) const;
 
@@ -92,7 +91,7 @@ public:
 	/* FrameInfo management */
 	FrameInfo* createFrameInfo(const FuncSymbol* fn);
 	const FrameInfo* getFrameInfo(const FuncSymbol* fn) const;
-	FrameInfo* getFrameInfo(FuncSymbol* fn);
+	FrameInfo* getFrameInfo(const FuncSymbol* fn);
 
 	/* Dana Symbol to LLVM value translation */
 	llvm::Value* lookupValue(const Symbol* sym);
