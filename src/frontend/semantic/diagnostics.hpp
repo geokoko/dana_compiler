@@ -20,7 +20,7 @@ struct LookupResult {
 class Diagnostics {
 public:
 	enum class Severity {
-		Info,
+		Note,
 		Warning,
 		Error
 	};
@@ -39,7 +39,6 @@ public:
 	};
 
 	void report(Severity severity, Phase phase, const SourceLoc& loc, const std::string& message);
-	void error(const SourceLoc& loc, const std::string& message);
 
 	bool hasErrors() const;
 	const std::vector<Entry>& entries() const;
