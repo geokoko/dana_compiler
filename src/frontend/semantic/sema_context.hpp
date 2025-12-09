@@ -8,6 +8,7 @@
 #include "../common/source_location.hpp"
 #include "../symbol/symbol.hpp"
 #include "../symbol/symbol_table.hpp"
+#include "../symbol/sematype.hpp"
 #include "diagnostics.hpp"
 
 class ASTNode;
@@ -74,11 +75,11 @@ public:
 
 	void setHeaderInfo(HeaderInfo info);
 	std::optional<HeaderInfo> takeHeaderInfo();
+	std::unique_ptr<Symbol> makeFunctionSymbol(const HeaderInfo& info);
 
 private:
     SymbolTable& symtab_;
     Diagnostics& diags_;
 	std::vector<FunctionFrame> functionStack_;
 	std::vector<LoopFrame> loopStack_;
-	std::optional<HeaderInfo> pendingHeader_;
 };
