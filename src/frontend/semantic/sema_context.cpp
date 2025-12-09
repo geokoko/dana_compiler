@@ -109,6 +109,16 @@ bool SemContext::hasLoopLabel(const std::string& label) const {
 	return false;
 }
 
+void SemContext::setHeaderInfo(HeaderInfo info) {
+	headerInfo_ = std::move(info);
+}
+
+std::optional<SemContext::HeaderInfo> SemContext::takeHeaderInfo() {
+	auto tmp = std::move(headerInfo_);
+	headerInfo_.reset();
+	return tmp;
+}
+
 std::unique_ptr<Symbol> SemContext::makeFunctionSymbol(const SemContext::HeaderInfo& info) {
 	std::vector<SemaTypePtr> paramTypes;
 	paramTypes.reserve(info.params.size());

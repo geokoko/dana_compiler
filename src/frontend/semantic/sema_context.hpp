@@ -82,4 +82,5 @@ private:
     Diagnostics& diags_;
 	std::vector<FunctionFrame> functionStack_;
 	std::vector<LoopFrame> loopStack_;
+	std::optional<HeaderInfo> headerInfo_;
 };
