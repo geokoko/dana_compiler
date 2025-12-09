@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_set>
+#include <cassert>
 
 #include "../ast/ast.hpp"
 #include "../symbol/sematype.hpp"
@@ -18,7 +19,6 @@ SemaTypePtr scalarType(DataType dt) {
 
 /* Compares two semantic types for equality */
 bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
-	// same pointer or both null
 	if (a == b) {
 		return true;
 	}
@@ -132,11 +132,11 @@ bool validateDimension(const std::optional<int>& dim, bool allowUnsized, const S
 		if (allowUnsized) {
 			return true;
 		}
-		context.diags().error(loc, "array dimension must be specified");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "array dimension must be specified");
 		return false;
 	}
 	if (*dim <= 0) {
-		context.diags().error(loc, "array dimension must be greater than zero");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "array dimension must be greater than zero");
 		return false;
 	}
 	return true;
@@ -187,16 +187,6 @@ SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemC
 	return resolved;
 }
 
-/* Builds a function signature's Type */
-SemaTypePtr buildFuncType(const SemContext::HeaderInfo& info) {
-	std::vector<SemaTypePtr> paramTypes;
-	paramTypes.reserve(info.params.size());
-	for (const auto& param : info.params) {
-		paramTypes.push_back(param.type);
-	}
-	return makeFuncType(info.returnType, std::move(paramTypes));
-}
-
 /* Sets function/procedure parameters from header info into the given symbol */
 void setSymbolParamsFromHeader(Symbol* symbol, const SemContext::HeaderInfo& info) {
 	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
@@ -220,7 +210,12 @@ bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
 	if (func->isProcedure() != info.isProcedure) {
 		return false;
 	}
-	auto expectedSig = buildFuncType(info);
+	std::vector<SemaTypePtr> paramTypes;
+	paramTypes.reserve(info.params.size());
+	for (const auto& param : info.params) {
+		paramTypes.push_back(param.type);
+	}
+	auto expectedSig = makeFuncType(info.returnType, std::move(paramTypes));
 	if (!typesEqual(expectedSig, func->getType())) {
 		return false;
 	}
@@ -268,7 +263,8 @@ bool ensureLoopLabelAvailable(SemContext& context, const std::optional<std::stri
 		return true;
 	}
 	if (context.hasLoopLabel(*label)) {
-		context.diags().error(loc, "loop label '" + *label + "' already in use");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "loop label '" + *label + "' already in use");
 		return false;
 	}
 	return true;
@@ -281,7 +277,7 @@ bool checkArguments(vec<up<Expr>>& args,
 					const std::string& callee,
 					const SourceLoc& loc) {
 	if (args.size() != params.size()) {
-		context.diags().error(loc,
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc,
 						"call to '" + callee + "' expects " + std::to_string(params.size()) +
 						" argument(s) but got " + std::to_string(args.size()));
 	}
@@ -294,17 +290,19 @@ bool checkArguments(vec<up<Expr>>& args,
 		}
 		auto actualType = arg ? arg->type() : SemaTypePtr{};
 		if (!typesCompatible(actualType, params[i]->getType())) {
-			context.diags().error(arg ? arg->loc : loc,
-						 "in call to '" + callee + "', argument " + std::to_string(i + 1) +
-						 " has type '" + typeToString(actualType) + "', expected '" +
-						 typeToString(params[i]->getType()) + "'");
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
+			                       arg ? arg->loc : loc,
+			                       "in call to '" + callee + "', argument " + std::to_string(i + 1) +
+			                       " has type '" + typeToString(actualType) + "', expected '" +
+			                       typeToString(params[i]->getType()) + "'");
 			ok = false;
 		}
 		if (params[i]->getPass() == Symbol::ParamPass::BY_REF) {
 			if (!arg || !arg->isLValue()) {
-				context.diags().error(arg ? arg->loc : loc,
-						  "in call to '" + callee + "', argument " + std::to_string(i + 1) +
-						  " must be an l-value for by-ref parameter");
+				context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
+				                       arg ? arg->loc : loc,
+				                       "in call to '" + callee + "', argument " + std::to_string(i + 1) +
+				                       " must be an l-value for by-ref parameter");
 				ok = false;
 			}
 		}
@@ -317,22 +315,14 @@ bool checkArguments(vec<up<Expr>>& args,
 	return ok;
 }
 
-std::unique_ptr<Symbol> makeFunctionSymbol(const SemContext::HeaderInfo& info) {
-	auto sig = buildFuncType(info);
-	auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
-	setSymbolParamsFromHeader(func.get(), info);
-	return func;
-}
-
 } // helper namespace 
 
 // Semantic analysis functions for AST nodes
 // Each sem() function performs semantic checks and type resolution
 
 void Program::sem(SemContext& context) {
-	if (context.scopeDepth() == 1) {
-		context.openScope();
-	}
+	assert(context.scopeDepth() == 1 && "Program.sem() should be called at global scope");
+	context.openScope();
 
 	if (top) {
 		top->sem(context);
@@ -368,7 +358,7 @@ void Header::sem(SemContext& context) {
 		}
 		const auto* typeNode = param->parameterType();
 		if (!typeNode) {
-			context.diags().error(param->loc, "missing parameter type");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, param->loc, "missing parameter type");
 			continue;
 		}
 
@@ -380,7 +370,8 @@ void Header::sem(SemContext& context) {
 
 		for (const auto& id : param->names()) {
 			if (!seen.insert(id).second) {
-				context.diags().error(param->loc, "duplicate parameter name '" + id + "' in header '" + name + "'");
+				context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						   param->loc, "duplicate parameter name '" + id + "' in header '" + name + "'");
 				continue;
 			}
 
@@ -422,21 +413,22 @@ void FuncDecl::sem(SemContext& context) {
 	Symbol* symbol = existing.symbol;
 	if (symbol) {
 		if (!signaturesMatch(*info, symbol)) {
-			context.diags().error(loc, "forward declaration of '" + info->name + "' conflicts with previous declaration");
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						  loc, "forward declaration of '" + info->name + "' conflicts with previous declaration");
 			return;
 		}
 		if (symbol->isDefined()) {
-			context.diags().error(loc, "symbol '" + info->name + "' already defined");
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						  loc, "symbol '" + info->name + "' already defined");
 			return;
 		}
-		setSymbolParamsFromHeader(symbol, *info);
-		tagDefiningFunc(symbol, context);
-		symbol->markForwardDeclaration();
+		context.diags().report(Diagnostics::Severity::Note, Diagnostics::Phase::Semantic,
+		                      symbol->getLocation(), "previous declaration here");
 		header->setSymbol(static_cast<FuncSymbol*>(symbol));
 		return;
 	}
 
-	auto sym = makeFunctionSymbol(*info);
+	auto sym = context.makeFunctionSymbol(*info);
 	Symbol* raw = sym.get();
 	tagDefiningFunc(raw, context);
 	context.declareSymbol(std::move(sym));
@@ -455,15 +447,17 @@ void FuncDef::sem(SemContext& context) {
 	Symbol* symbol = existing.symbol;
 	if (symbol) {
 		if (!signaturesMatch(*info, symbol)) {
-			context.diags().error(loc, "definition of '" + info->name + "' does not match prior declaration");
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						  loc, "definition of '" + info->name + "' does not match prior declaration");
 			return;
 		}
 		if (symbol->isDefined()) {
-			context.diags().error(loc, "redefinition of '" + info->name + "'");
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						  loc, "redefinition of '" + info->name + "'");
 			return;
 		}
 	} else {
-		auto sym = makeFunctionSymbol(*info);
+		auto sym = context.makeFunctionSymbol(*info);
 		symbol = sym.get();
 		context.declareSymbol(std::move(sym));
 	}
@@ -502,7 +496,8 @@ void FuncDef::sem(SemContext& context) {
 	symbol->markDefined();
 
 	if (needsReturn) {
-		context.diags().error(loc, "not all paths in function '" + info->name + "' return a value");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "no path in function '" + info->name + "' returns a value");
 	}
 }
 
@@ -511,11 +506,13 @@ void SkipStmt::sem(SemContext&) {}
 void ExitStmt::sem(SemContext& context) {
 	auto* frame = context.currentFunction();
 	if (!frame) {
-		context.diags().error(loc, "'exit' outside of procedure");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "'exit' outside of procedure");
 		return;
 	}
 	if (!frame->isProcedure) {
-		context.diags().error(loc, "'exit' allowed only inside procedures");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "'exit' allowed only inside procedures");
 	}
 }
 
@@ -529,20 +526,23 @@ void AssignStmt::sem(SemContext& context) {
 	auto leftType = lhs ? lhs->type() : SemaTypePtr{};
 	auto rightType = rhs ? rhs->type() : SemaTypePtr{};
 	if (!leftType) {
-		context.diags().error(loc, "invalid assignment target");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "invalid assignment target");
 		return;
 	}
 	if (isArrayType(leftType)) {
-		context.diags().error(loc, "cannot assign to an array value");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "cannot assign to an array value");
 		return;
 	}
 	if (lhs && !lhs->isAssignable()) {
-		context.diags().error(loc, "left-hand side of assignment is not assignable");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "left-hand side of assignment is not assignable");
 		return;
 	}
 	if (!typesEqual(leftType, rightType)) {
-		context.diags().error(loc, "assignment type mismatch: left is '" + typeToString(leftType) + 
-						"', right is '" + typeToString(rightType) + "'");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc,
+			"assignment type mismatch: left is '" + typeToString(leftType) + "', right is '" + typeToString(rightType) + "'");
 	}
 }
 
@@ -559,28 +559,33 @@ void LoopStmt::sem(SemContext& context) {
 
 void BreakStmt::sem(SemContext& context) {
 	if (!context.inLoop()) {
-		context.diags().error(loc, "'break' used outside of loop");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "'break' used outside of loop");
 		return;
 	}
 	if (label && !context.hasLoopLabel(*label)) {
-		context.diags().error(loc, "unknown loop label '" + *label + "'");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "unknown loop label '" + *label + "'");
 	}
 }
 
 void ContinueStmt::sem(SemContext& context) {
 	if (!context.inLoop()) {
-		context.diags().error(loc, "'continue' used outside of loop");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "'continue' used outside of loop");
 		return;
 	}
 	if (label && !context.hasLoopLabel(*label)) {
-		context.diags().error(loc, "unknown loop label '" + *label + "'");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "unknown loop label '" + *label + "'");
 	}
 }
 
 void ReturnStmt::sem(SemContext& context) {
 	auto* frame = context.currentFunction();
 	if (!frame) {
-		context.diags().error(loc, "'return' outside of function");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "'return' outside of function");
 		return;
 	}
 	if (value) {
@@ -588,17 +593,19 @@ void ReturnStmt::sem(SemContext& context) {
 	}
 	if (frame->isProcedure) {
 		if (value) {
-			context.diags().error(loc, "procedures cannot return a value");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "procedures cannot return a value");
 		}
 		frame->sawReturn = true;
 		return;
 	}
 	if (!value) {
-		context.diags().error(loc, "functions must return a value");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "functions must return a value");
 		return;
 	}
 	if (!typesEqual(frame->returnType, value->type())) {
-		context.diags().error(loc,
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc,
 						"return type mismatch: expected '" + typeToString(frame->returnType) +
 						"' but got '" + typeToString(value->type()) + "'");
 	}
@@ -612,7 +619,7 @@ void ProcCall::sem(SemContext& context) {
 		? static_cast<FuncSymbol*>(symbol)
 		: nullptr;
 	if (!funcSym || !funcSym->isProcedure()) {
-		context.diags().error(loc, "unknown procedure '" + name + "'");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "unknown procedure '" + name + "'");
 		setSymbol(nullptr);
 		return;
 	}
@@ -645,7 +652,7 @@ void IdLVal::sem(SemContext& context) {
 	auto lookup = context.lookupSymbol(name);
 	Symbol* symbol = lookup.symbol;
 	if (!symbol || !(symbol->isVariable() || symbol->isParameter())) {
-		context.diags().error(loc, "unknown variable '" + name + "'");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "unknown variable '" + name + "'");
 		setType(nullptr);
 		setAssignable(false);
 		setSymbol(nullptr);
@@ -672,13 +679,13 @@ void IndexLVal::sem(SemContext& context) {
 	}
 	auto baseType = base ? base->type() : SemaTypePtr{};
 	if (!isArrayType(baseType)) {
-		context.diags().error(loc, "cannot index non-array value");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "cannot index non-array value");
 		setType(nullptr);
 		setAssignable(false);
 		return;
 	}
 	if (!index || !isIntType(index->type())) {
-		context.diags().error(loc, "array index must be of type int");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "array index must be of type int");
 	}
 	setType(elementTypeOf(baseType));
 	setAssignable(base ? base->isAssignable() : true);
@@ -733,7 +740,7 @@ void FuncCall::sem(SemContext& context) {
 		? static_cast<FuncSymbol*>(symbol)
 		: nullptr;
 	if (!funcSym || funcSym->isProcedure()) {
-		context.diags().error(loc, "unknown function '" + name + "'");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "unknown function '" + name + "'");
 		setSymbol(nullptr);
 		setType(nullptr);
 		return;
@@ -756,13 +763,15 @@ void UnaryExpr::sem(SemContext& context) {
 		case UnOp::Plus:
 		case UnOp::Minus:
 			if (!isIntType(operandType)) {
-				context.diags().error(loc, "unary '+' and '-' require int operand");
+				context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						   loc, "unary '+' and '-' require int operand");
 			}
 			setType(makeIntType());
 			break;
 		case UnOp::Not:
 			if (!isByteType(operandType)) {
-				context.diags().error(loc, "'!' requires byte operand");
+				context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						   loc, "'!' requires byte operand");
 			}
 			setType(makeByteType());
 			break;
@@ -788,14 +797,16 @@ void BinaryExpr::sem(SemContext& context) {
 		case BinOp::Mod:
 			if (!typesEqual(leftType, rightType) ||
 				!(isIntType(leftType) || isByteType(leftType))) {
-				context.diags().error(loc, "arithmetic operands must both be int or byte");
+				context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						   loc, "arithmetic operands must both be int or byte");
 			}
 			setType(leftType);
 			break;
 		case BinOp::AndBits:
 		case BinOp::OrBits:
 			if (!isByteType(leftType) || !typesEqual(leftType, rightType)) {
-				context.diags().error(loc, "'&' and '|' require byte operands");
+				context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						   loc, "'&' and '|' require byte operands");
 			}
 			setType(makeByteType());
 			break;
@@ -811,7 +822,7 @@ void ExprCond::sem(SemContext& context) {
 		expr->sem(context);
 	}
 	if (!isByteType(expr ? expr->type() : SemaTypePtr{})) {
-		context.diags().error(loc, "condition expression must have type byte");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc, "condition expression must have type byte");
 	}
 	setType(makeByteType());
 }
@@ -850,7 +861,8 @@ void RelCond::sem(SemContext& context) {
 	auto lt = lhs ? lhs->type() : SemaTypePtr{};
 	auto rt = rhs ? rhs->type() : SemaTypePtr{};
 	if (!typesEqual(lt, rt) || !(isIntType(lt) || isByteType(lt))) {
-		context.diags().error(loc, "comparison requires operands of the same numeric type");
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						 loc, "comparison requires operands of the same numeric type");
 	}
 	setType(makeByteType());
 }

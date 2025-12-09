@@ -5,7 +5,7 @@
 namespace {
 	const char* toString(Diagnostics::Severity s) {
 		switch (s) {
-			case Diagnostics::Severity::Info: return "info";
+			case Diagnostics::Severity::Note: return "note";
 			case Diagnostics::Severity::Warning: return "warning";
 			case Diagnostics::Severity::Error: return "error";
 		}
@@ -24,10 +24,6 @@ namespace {
 
 void Diagnostics::report(Severity severity, Phase phase, const SourceLoc& loc, const std::string& message) {
 	messages_.push_back(Entry{severity, phase, loc, message});
-}
-
-void Diagnostics::error(const SourceLoc& loc, const std::string& message) {
-	report(Severity::Error, Phase::Semantic, loc, message);
 }
 
 bool Diagnostics::hasErrors() const {
