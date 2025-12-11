@@ -22,10 +22,12 @@ void LLVMCodegen::gen(CharConst& n) {
 }
 
 void LLVMCodegen::gen(TrueConst& n) {
+	(void)n;
 	value = genCtx.builder().getInt8(1);
 }
 
 void LLVMCodegen::gen(FalseConst& n) {
+	(void)n;
 	value = genCtx.builder().getInt8(0);
 }
 
@@ -204,4 +206,3 @@ void LLVMCodegen::gen(IndexLVal& n) {
 	// Fallback: treat basePtr as pointer to element type
 	value = genCtx.builder().CreateInBoundsGEP(elemTy, basePtr, indexVal, "idx.elem");
 }
-
