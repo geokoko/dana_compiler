@@ -44,7 +44,6 @@ void LLVMCodegen::gen(FuncDef& n) {
 	if (auto* parentSym = funcSym->definingFunc()) {
 		if (const auto* parentInfo = genCtx.getFrameInfo(parentSym)) {
 			parentFrameTy = parentInfo->getFrameType();
-			(void)parentFrameTy;
 		}
 	}
 
@@ -118,6 +117,13 @@ void LLVMCodegen::gen(FuncDef& n) {
 		genCtx.bindFunction(funcSym, llvmFunc);
 	}
 
+	// Generate nested functions first
+	for (auto& def : n.localDefs()) {
+        if (auto* nestedFunc = dynamic_cast<FuncDef*>(def.get())) {
+            nestedFunc->agen(*this);
+        }
+    }
+
 	// Entry block + frame allocation
 	auto* entry = llvm::BasicBlock::Create(genCtx.llvmContext(), "entry", llvmFunc);
 	genCtx.builder().SetInsertPoint(entry);
@@ -127,7 +133,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 	// Enter function context
 	genCtx.enterFunction(funcSym, framePtr);
 
-	/* Bind static link and parameters to frame fields */
+	/* Bind static link (if we need one) and parameters to frame fields */
 	auto argIt = llvmFunc->arg_begin();
 
 	if (needsStaticLink) {
@@ -142,7 +148,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 		genCtx.builder().CreateStore(nullPtr, staticLinkPtr);
 	}
 
-	// Bind parameters into the frame 
+	// Bind parameters into the frame fields
 	for (const auto& p : funcSym->getParams()) {
 		auto idxOpt = frameInfo->getCapturedVarIndex(p.get());
 		assert(idxOpt.has_value());
@@ -153,14 +159,13 @@ void LLVMCodegen::gen(FuncDef& n) {
 		genCtx.builder().CreateStore(paramArg, paramPtr);
 	}
 
-	// Locals: only slots in the frame 
+	// Locals: only slots in the frame (remove GEP from here, used during lookup for local usage)
 	for (auto& def : n.localDefs()) {
 		if (auto* var = dynamic_cast<VarDef*>(def.get())) {
 			for (auto* sym : var->symbols()) {
 				auto idxOpt = frameInfo->getCapturedVarIndex(sym);
 				assert(idxOpt.has_value());
-				std::size_t idx = *idxOpt;
-				llvm::Value* localPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr, idx, sym->getName() + ".ptr");
+				(void)idxOpt;
 			}
 		}
 	}
@@ -182,4 +187,3 @@ void LLVMCodegen::gen(FuncDef& n) {
 	genCtx.leaveFunction();
 	value = nullptr;
 }
-
