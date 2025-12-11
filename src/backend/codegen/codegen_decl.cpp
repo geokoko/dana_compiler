@@ -176,7 +176,8 @@ void LLVMCodegen::gen(FuncDef& n) {
 	}
 
 	/* Default return if none emitted */
-	if (!entry->getTerminator()) {
+	llvm::BasicBlock* curBB = genCtx.builder().GetInsertBlock();
+	if (curBB && !curBB->getTerminator()) {
 		if (retTy->isVoidTy()) {
 			genCtx.builder().CreateRetVoid();
 		} else {
