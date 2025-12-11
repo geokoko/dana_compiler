@@ -1,7 +1,7 @@
 # Compiler settings
 # using g++ as the C++ compiler, with C++17 standard
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -g
+CXXFLAGS = -std=c++17 -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -g
 
 # LLVM flags (using llvm 18)
 LLVM_CONFIG = llvm-config-18
