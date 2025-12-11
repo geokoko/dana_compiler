@@ -319,9 +319,6 @@ bool checkArguments(vec<up<Expr>>& args,
 // Each sem() function performs semantic checks and type resolution
 
 void Program::sem(SemContext& context) {
-	assert(context.scopeDepth() == 1 && "Program.sem() should be called at global scope");
-	context.openScope();
-
 	if (top) {
 		top->sem(context);
 	}
@@ -403,6 +400,7 @@ void VarDef::sem(SemContext& context) {
 void FuncDecl::sem(SemContext& context) {
 	header->sem(context);
 	auto info = context.takeHeaderInfo();
+	std::cout << "FuncDecl::sem: processing declaration of " << (info ? info->name : "<invalid>") << "\n";
 	if (!info) {
 		return;
 	}
