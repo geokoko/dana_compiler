@@ -6,14 +6,13 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
 
-static void declareBuiltins(SemContext& ctx) {
-	ctx.openScope();
+void declareBuiltins(SemContext& ctx) {
 	SemContext::HeaderInfo info;
 	SemContext::ParamInfo param;
 	info.loc = SourceLoc::builtin();
 	param.loc = SourceLoc::builtin();
 
-	for (int i = 0; i < sizeof(builtinTable) / sizeof(DanaBuiltin); ++i) {
+	for (std::size_t i = 0; i < sizeof(builtinTable) / sizeof(DanaBuiltin); ++i) {
 		switch (i) {
 			case 0: // writeInteger
 				{
@@ -194,13 +193,21 @@ static void declareBuiltins(SemContext& ctx) {
 	}
 }
 
-static void genBuiltins(CodegenContext& ctx) {
-	auto& mod = ctx.llvmModule();
+void genBuiltins(SemContext& semCtx, CodegenContext& ctx) {
+	auto& mod   = ctx.llvmModule();
 	auto& llctx = ctx.llvmContext();
 
 	auto* i32Ty = llvm::Type::getInt32Ty(llctx);
 	auto* i8Ty  = llvm::Type::getInt8Ty(llctx);
 	auto* ptrTy = llvm::PointerType::get(llctx, 0);
+
+	auto bind = [&](const char* danaName, llvm::Function* fn) {
+		if (!fn) return;
+		auto res = semCtx.lookupSymbol(danaName);
+		if (res.symbol && res.symbol->getKind() == Symbol::SymKind::FUNC) {
+			ctx.bindFunction(static_cast<FuncSymbol*>(res.symbol), fn);
+		}
+	};
 
 	llvm::FunctionType* writeIntTy  = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {i32Ty}, false);
 	llvm::FunctionType* writeByteTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {i8Ty}, false);
@@ -211,34 +218,34 @@ static void genBuiltins(CodegenContext& ctx) {
 	llvm::FunctionType* readByteTy  = llvm::FunctionType::get(i8Ty, {}, false);
 	llvm::FunctionType* readCharTy  = llvm::FunctionType::get(i8Ty, {}, false);
 
-	llvm::Function::Create(writeIntTy,  llvm::Function::ExternalLinkage, "writeInteger", &mod);
-	llvm::Function::Create(writeByteTy, llvm::Function::ExternalLinkage, "writeByte", &mod);
-	llvm::Function::Create(writeCharTy, llvm::Function::ExternalLinkage, "writeChar", &mod);
-	llvm::Function::Create(writeStrTy,  llvm::Function::ExternalLinkage, "writeString", &mod);
+	bind("writeInteger", llvm::Function::Create(writeIntTy,  llvm::Function::ExternalLinkage, "writeInteger", &mod));
+	bind("writeByte",    llvm::Function::Create(writeByteTy, llvm::Function::ExternalLinkage, "writeByte", &mod));
+	bind("writeChar",    llvm::Function::Create(writeCharTy, llvm::Function::ExternalLinkage, "writeChar", &mod));
+	bind("writeString",  llvm::Function::Create(writeStrTy,  llvm::Function::ExternalLinkage, "writeString", &mod));
 
-	llvm::Function::Create(readIntTy,   llvm::Function::ExternalLinkage, "readInteger", &mod);
-	llvm::Function::Create(readByteTy,  llvm::Function::ExternalLinkage, "readByte", &mod);
-	llvm::Function::Create(readCharTy,  llvm::Function::ExternalLinkage, "readChar", &mod);
+	bind("readInteger", llvm::Function::Create(readIntTy,   llvm::Function::ExternalLinkage, "readInteger", &mod));
+	bind("readByte",    llvm::Function::Create(readByteTy,  llvm::Function::ExternalLinkage, "readByte", &mod));
+	bind("readChar",    llvm::Function::Create(readCharTy,  llvm::Function::ExternalLinkage, "readChar", &mod));
 
 	llvm::FunctionType* readStrTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx),
 	                                                       {i32Ty, ptrTy}, false);
-	llvm::Function::Create(readStrTy, llvm::Function::ExternalLinkage, "readString", &mod);
+	bind("readString", llvm::Function::Create(readStrTy, llvm::Function::ExternalLinkage, "readString", &mod));
 
 	llvm::FunctionType* extendTy = llvm::FunctionType::get(i32Ty, {i8Ty}, false);
-	llvm::Function::Create(extendTy, llvm::Function::ExternalLinkage, "extend", &mod);
+	bind("extend", llvm::Function::Create(extendTy, llvm::Function::ExternalLinkage, "extend", &mod));
 
 	llvm::FunctionType* shrinkTy = llvm::FunctionType::get(i8Ty, {i32Ty}, false);
-	llvm::Function::Create(shrinkTy, llvm::Function::ExternalLinkage, "shrink", &mod);
+	bind("shrink", llvm::Function::Create(shrinkTy, llvm::Function::ExternalLinkage, "shrink", &mod));
 
 	llvm::FunctionType* strlenTy = llvm::FunctionType::get(i32Ty, {ptrTy}, false);
-	llvm::Function::Create(strlenTy, llvm::Function::ExternalLinkage, "strlen", &mod);
+	bind("strlen", llvm::Function::Create(strlenTy, llvm::Function::ExternalLinkage, "strlen", &mod));
 
 	llvm::FunctionType* strcpyTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {ptrTy, ptrTy}, false);
-	llvm::Function::Create(strcpyTy, llvm::Function::ExternalLinkage, "strcpy", &mod);
+	bind("strcpy", llvm::Function::Create(strcpyTy, llvm::Function::ExternalLinkage, "strcpy", &mod));
 
 	llvm::FunctionType* strcatTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {ptrTy, ptrTy}, false);
-	llvm::Function::Create(strcatTy, llvm::Function::ExternalLinkage, "strcat", &mod);
+	bind("strcat", llvm::Function::Create(strcatTy, llvm::Function::ExternalLinkage, "strcat", &mod));
 
 	llvm::FunctionType* strcmpTy = llvm::FunctionType::get(i32Ty, {ptrTy, ptrTy}, false);
-	llvm::Function::Create(strcmpTy, llvm::Function::ExternalLinkage, "strcmp", &mod);
+	bind("strcmp", llvm::Function::Create(strcmpTy, llvm::Function::ExternalLinkage, "strcmp", &mod));
 }
