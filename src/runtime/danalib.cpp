@@ -188,8 +188,26 @@ void declareBuiltins(SemContext& ctx) {
 				break;
 		}
 		
-		auto sym = ctx.makeFunctionSymbol(info);
-		ctx.declareSymbol(std::move(sym), /*reportDuplicates=*/false);
+		std::vector<SemaTypePtr> paramTypes;
+		paramTypes.reserve(info.params.size());
+		for (const auto& p : info.params) {
+			paramTypes.push_back(p.type);
+		}
+		auto sig = makeFuncType(info.returnType, std::move(paramTypes));
+		auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
+
+		ctx.openScope();
+		for (const auto& pInfo : info.params) {
+			auto p = std::make_unique<ParamSymbol>(pInfo.name, pInfo.type, pInfo.passMode, pInfo.loc);
+			p->setDefiningFunc(func.get());
+			auto res = ctx.declareSymbol(std::move(p));
+			if (res.symbol) {
+				func->addParam(static_cast<ParamSymbol*>(res.symbol));
+			}
+		}
+		ctx.closeScope();
+
+		ctx.declareSymbol(std::move(func), /*reportDuplicates=*/false);
 	}
 }
 

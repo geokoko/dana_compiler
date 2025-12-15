@@ -75,7 +75,6 @@ public:
 
 	void setHeaderInfo(HeaderInfo info);
 	std::optional<HeaderInfo> takeHeaderInfo();
-	std::unique_ptr<Symbol> makeFunctionSymbol(const HeaderInfo& info);
 
 private:
     SymbolTable& symtab_;
