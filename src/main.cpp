@@ -9,6 +9,7 @@
 #include "./frontend/symbol/symbol_table.hpp"
 #include "./backend/codegen/codegen_context.hpp"
 #include "./backend/codegen/codegen.hpp"
+#include "./backend/optimizer/optimizer.h"
 #include "./runtime/danalib.hpp"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
@@ -35,18 +36,32 @@ static bool run_command(const std::string& cmd) {
 }
 
 static void print_usage(const char* prog) {
-	std::cerr << "Usage: " << prog << " [--ast-tree] <file.dana>\n";
+	std::cerr << "Usage: " << prog << " [--ast-tree] [-O0|-O1|-O2|-O3] <file.dana>\n";
 }
 
 int main(int argc, char** argv) {
 	bool want_tree = false;
 	const char* fname = nullptr;
+    llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
+    std::string optFlag = "-O0";
 
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];
 		if (arg == "--ast-tree") {
 			want_tree = true;
-		} else if (!fname) {
+		} else if (arg == "-O0") {
+            optLevel = llvm::OptimizationLevel::O0;
+            optFlag = "-O0";
+        } else if (arg == "-O1") {
+            optLevel = llvm::OptimizationLevel::O1;
+            optFlag = "-O1";
+        } else if (arg == "-O2") {
+            optLevel = llvm::OptimizationLevel::O2;
+            optFlag = "-O2";
+        } else if (arg == "-O3") {
+            optLevel = llvm::OptimizationLevel::O3;
+            optFlag = "-O3";
+        } else if (!fname) {
 			fname = argv[i];
 		} else {
 			print_usage(argv[0]);
@@ -110,6 +125,8 @@ int main(int argc, char** argv) {
 	LLVMCodegen generate(codegenCtx);
 	ast_root->agen(generate);
 
+	Optimizer optimizer;
+	optimizer.optimize(codegenCtx.llvmModule(), optLevel);
 	
 	codegenCtx.llvmModule().print(llvm::outs(), nullptr);
 	llvm::outs().flush();
@@ -132,7 +149,7 @@ int main(int argc, char** argv) {
 	}
 	std::string asmPath = change_extension(filename, ".asm");
 	{
-		std::string cmd = "llc -filetype=asm \"" + immPath + "\" -o \"" + asmPath + "\"";
+		std::string cmd = "llc " + optFlag + " -filetype=asm \"" + immPath + "\" -o \"" + asmPath + "\"";
 		if (!run_command(cmd)) {
 			std::cerr << "Failed to generate assembly (.asm).\n";
 			return 1;
@@ -141,7 +158,7 @@ int main(int argc, char** argv) {
 
 	std::string objPath = change_extension(filename, ".o");
 	{
-		std::string cmd = "llc -filetype=obj \"" + immPath + "\" -o \"" + objPath + "\"";
+		std::string cmd = "llc " + optFlag + " -filetype=obj \"" + immPath + "\" -o \"" + objPath + "\"";
 		if (!run_command(cmd)) {
 			std::cerr << "Failed to generate object file (.o).\n";
 			return 1;

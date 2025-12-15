@@ -68,6 +68,7 @@ SRCS := main.cpp \
 		$(BACKEND_DIR)/codegen/codegen_expr.cpp \
 		$(BACKEND_DIR)/codegen/codegen_loop.cpp \
 		$(BACKEND_DIR)/codegen/codegen_stmt.cpp \
+		$(BACKEND_DIR)/optimizer/optimizer.cpp \
 		${RUNTIME_DIR}/danalib.cpp \
 		$(PARSER_CPP) \
 		$(LEXER_CPP)
