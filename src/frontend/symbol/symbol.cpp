@@ -60,13 +60,13 @@ bool FuncSymbol::isProcedure() const {
 	return isProcedure_; 
 }
 
-void FuncSymbol::addParam(std::shared_ptr<ParamSymbol> param) {
+void FuncSymbol::addParam(ParamSymbol* param) {
     if (param) {
-        params_.push_back(std::move(param));
+        params_.push_back(param);
     }
 }
 
-const std::vector<std::shared_ptr<ParamSymbol>>& FuncSymbol::getParams() const {
+const std::vector<ParamSymbol*>& FuncSymbol::getParams() const {
     return params_;
 }
 

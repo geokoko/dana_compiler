@@ -176,20 +176,6 @@ SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemC
 	return resolved;
 }
 
-/* Sets function/procedure parameters from header info into the given symbol */
-void setSymbolParamsFromHeader(Symbol* symbol, const SemContext::HeaderInfo& info) {
-	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
-		return;
-	}
-	auto* func = static_cast<FuncSymbol*>(symbol);
-	func->clearParams();
-	for (const auto& param : info.params) {
-		auto p = std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
-		p->setDefiningFunc(func);
-		func->addParam(std::move(p));
-	}
-}
-
 /* Checks if a function/procedure signature matches the provided header info */
 bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
 	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
@@ -223,17 +209,6 @@ bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
 	return true;
 }
 
-/* Declares function/procedure parameters in the current scope */
-void declareParamsInScope(const SemContext::HeaderInfo& info, SemContext& context) {
-	for (const auto& param : info.params) {
-		auto sym = std::make_unique<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
-		if (auto* frame = context.currentFunction()) {
-			sym->setDefiningFunc(static_cast<FuncSymbol*>(frame->symbol));
-		}
-		context.declareSymbol(std::move(sym));
-	}
-}
-
 /* Ensures that a loop label is not already in use */
 bool ensureLoopLabelAvailable(SemContext& context, const std::optional<std::string>& label, const SourceLoc& loc) {
 	if (!label) {
@@ -249,7 +224,7 @@ bool ensureLoopLabelAvailable(SemContext& context, const std::optional<std::stri
 
 /* Checks function/procedure call arguments against parameters */
 bool checkArguments(vec<up<Expr>>& args,
-					const std::vector<std::shared_ptr<ParamSymbol>>& params,
+					const std::vector<ParamSymbol*>& params,
 					SemContext& context,
 					const std::string& callee,
 					const SourceLoc& loc) {
@@ -405,12 +380,30 @@ void FuncDecl::sem(SemContext& context) {
 		return;
 	}
 
-	auto sym = context.makeFunctionSymbol(*info);
-	Symbol* raw = sym.get();
+	std::vector<SemaTypePtr> paramTypes;
+	paramTypes.reserve(info->params.size());
+	for (const auto& param : info->params) {
+		paramTypes.push_back(param.type);
+	}
+	auto sig = makeFuncType(info->returnType, std::move(paramTypes));
+	auto func = std::make_unique<FuncSymbol>(info->name, std::move(sig), info->isProcedure, info->loc);
+
+	context.openScope();
+	for (const auto& paramInfo : info->params) {
+		auto p = std::make_unique<ParamSymbol>(paramInfo.name, paramInfo.type, paramInfo.passMode, paramInfo.loc);
+		p->setDefiningFunc(func.get());
+		auto result = context.declareSymbol(std::move(p));
+		if (result.symbol) {
+			func->addParam(static_cast<ParamSymbol*>(result.symbol));
+		}
+	}
+	context.closeScope();
+
+	Symbol* raw = func.get();
 	if (auto* frame = context.currentFunction()) {
 		raw->setDefiningFunc(static_cast<FuncSymbol*>(frame->symbol));
 	}
-	context.declareSymbol(std::move(sym));
+	context.declareSymbol(std::move(func));
 	raw->markForwardDeclaration();
 	header->setSymbol(static_cast<FuncSymbol*>(raw));
 }
@@ -435,16 +428,22 @@ void FuncDef::sem(SemContext& context) {
 						  loc, "redefinition of '" + info->name + "'");
 			return;
 		}
-	} else {
-		auto sym = context.makeFunctionSymbol(*info);
-		symbol = sym.get();
-		context.declareSymbol(std::move(sym));
-	}
+	} 
 
-	if (auto* frame = context.currentFunction()) {
-		symbol->setDefiningFunc(static_cast<FuncSymbol*>(frame->symbol));
+	// Create new function symbol if not already declared
+	std::vector<SemaTypePtr> paramTypes;
+	paramTypes.reserve(info->params.size());
+	for (const auto& param : info->params) {
+		paramTypes.push_back(param.type);
 	}
-	header->setSymbol(static_cast<FuncSymbol*>(symbol));
+	auto sig = makeFuncType(info->returnType, std::move(paramTypes));
+	auto func = std::make_unique<FuncSymbol>(info->name, std::move(sig), info->isProcedure, info->loc);
+	symbol = func.get();
+	context.declareSymbol(std::move(func));
+	
+	auto* fsym = static_cast<FuncSymbol*>(symbol);
+	symbol->setDefiningFunc(fsym);
+	header->setSymbol(fsym);
 
 	context.openScope();
 	// create a function frame and store inside SemContext driver
@@ -455,8 +454,15 @@ void FuncDef::sem(SemContext& context) {
 	frame.sawReturn = false;
 	context.enterFunction(frame);
 
-	setSymbolParamsFromHeader(symbol, *info);
-	declareParamsInScope(*info, context);
+	// After entering function, declare parameters in the new scope
+	for (const auto& paramInfo : info->params) {
+		auto sym = std::make_unique<ParamSymbol>(paramInfo.name, paramInfo.type, paramInfo.passMode, paramInfo.loc);
+		sym->setDefiningFunc(fsym);
+		auto result = context.declareSymbol(std::move(sym));
+		if (result.symbol) {
+			func->addParam(static_cast<ParamSymbol*>(result.symbol));
+		}
+	}
 
 	for (auto& def : locals) {
 		if (def) {

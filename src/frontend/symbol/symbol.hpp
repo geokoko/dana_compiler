@@ -69,12 +69,12 @@ public:
 	FuncSymbol(std::string name, SemaTypePtr sigType, bool isProc, SourceLoc loc):
 		Symbol(std::move(name), SymKind::FUNC, std::move(sigType), loc), isProcedure_(isProc) {};
 	
-	void addParam(std::shared_ptr<ParamSymbol> param);
-	const std::vector<std::shared_ptr<ParamSymbol>>& getParams() const;
+	void addParam(ParamSymbol* param);
+	const std::vector<ParamSymbol*>& getParams() const;
 	bool isProcedure () const;
 	void clearParams();
 
 private:
-	std::vector<std::shared_ptr<ParamSymbol>> params_;
+	std::vector<ParamSymbol*> params_;
 	bool isProcedure_;	
 };

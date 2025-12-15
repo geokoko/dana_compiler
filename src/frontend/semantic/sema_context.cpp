@@ -119,19 +119,4 @@ std::optional<SemContext::HeaderInfo> SemContext::takeHeaderInfo() {
 	return tmp;
 }
 
-std::unique_ptr<Symbol> SemContext::makeFunctionSymbol(const SemContext::HeaderInfo& info) {
-	std::vector<SemaTypePtr> paramTypes;
-	paramTypes.reserve(info.params.size());
-	for (const auto& param : info.params) {
-		paramTypes.push_back(param.type);
-	}
-	auto sig = makeFuncType(info.returnType, std::move(paramTypes));
-	auto func = std::make_unique<FuncSymbol>(info.name, std::move(sig), info.isProcedure, info.loc);
-	func->clearParams();
-	for (const auto& param : info.params) {
-		auto p = std::make_shared<ParamSymbol>(param.name, param.type, param.passMode, param.loc);
-		p->setDefiningFunc(func.get());
-		func->addParam(std::move(p));
-	}
-	return func;
-}
+

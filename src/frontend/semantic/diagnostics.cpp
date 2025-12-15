@@ -47,3 +47,4 @@ void Diagnostics::printAll() const {
 		          << entry.message << '\n';
 	}
 }
+
