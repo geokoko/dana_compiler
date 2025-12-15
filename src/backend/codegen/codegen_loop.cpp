@@ -3,7 +3,8 @@
 /* ========== Loops ========== */
 
 void LLVMCodegen::gen(LoopStmt& n) {
-	auto* function = genCtx.builder().GetInsertBlock() ? genCtx.builder().GetInsertBlock()->getParent() : nullptr;
+	auto* curBB = genCtx.builder().GetInsertBlock();
+	auto* function = curBB ? genCtx.builder().GetInsertBlock()->getParent() : nullptr;
 	if (!function) {
 		value = nullptr;
 		return;
@@ -13,25 +14,26 @@ void LLVMCodegen::gen(LoopStmt& n) {
 	auto* bodyBB = llvm::BasicBlock::Create(genCtx.llvmContext(), prefix + ".body", function);
 	auto* exitBB = llvm::BasicBlock::Create(genCtx.llvmContext(), prefix + ".end", function);
 
-	auto* currentBB = genCtx.builder().GetInsertBlock();
-	if (currentBB && !currentBB->getTerminator()) {
+	if (curBB && !curBB->getTerminator()) {
 		genCtx.builder().CreateBr(bodyBB);
 	}
 
 	genCtx.builder().SetInsertPoint(bodyBB);
-	if (auto* fi = genCtx.currentFrameInfo()) {
-		fi->pushLoop(exitBB, bodyBB);
-	}
+	genCtx.pushLoop(exitBB, bodyBB);
+
 	if (auto* body = n.loopBody()) {
 		body->agen(*this);
 	}
-	if (!bodyBB->getTerminator()) {
+
+	// Ensure jump back to body from possible other blocks
+	auto* jumpBlock = genCtx.builder().GetInsertBlock();
+	if (!jumpBlock->getTerminator()) {
 		genCtx.builder().CreateBr(bodyBB);
 	}
-	if (auto* fi = genCtx.currentFrameInfo()) {
-		fi->popLoop();
-	}
+	
+	genCtx.popLoop();
 
+	// Continue from this basic block
 	genCtx.builder().SetInsertPoint(exitBB);
 	value = nullptr;
 }
@@ -40,8 +42,7 @@ void LLVMCodegen::gen(LoopStmt& n) {
 
 void LLVMCodegen::gen(BreakStmt& n) {
 	(void)n;
-	auto* frameInfo   = genCtx.currentFrameInfo();
-	auto* breakTarget = frameInfo ? frameInfo->currentBreakTarget() : nullptr;
+	auto* breakTarget = genCtx.currentBreakTarget();
 	if (!breakTarget) {
 		value = nullptr;
 		return;
@@ -53,14 +54,15 @@ void LLVMCodegen::gen(BreakStmt& n) {
 	if (parentFn) {
 		auto* contBB = llvm::BasicBlock::Create(genCtx.llvmContext(), "break.cont", parentFn);
 		genCtx.builder().SetInsertPoint(contBB);
+		// Must have a terminator
+		genCtx.builder().CreateUnreachable();
 	}
 	value = nullptr;
 }
 
 void LLVMCodegen::gen(ContinueStmt& n) {
 	(void)n;
-	auto* frameInfo      = genCtx.currentFrameInfo();
-	auto* continueTarget = frameInfo ? frameInfo->currentContinueTarget() : nullptr;
+	auto* continueTarget = genCtx.currentContinueTarget();
 	if (!continueTarget) {
 		value = nullptr;
 		return;
@@ -72,8 +74,9 @@ void LLVMCodegen::gen(ContinueStmt& n) {
 	if (parentFn) {
 		auto* contBB = llvm::BasicBlock::Create(genCtx.llvmContext(), "continue.cont", parentFn);
 		genCtx.builder().SetInsertPoint(contBB);
+		// Must have a terminator
+		genCtx.builder().CreateUnreachable();
 	}
 	value = nullptr;
 }
-
 
