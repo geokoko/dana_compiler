@@ -1,15 +1,17 @@
-# Compiler settings
-# using g++ as the C++ compiler, with C++17 standard
-CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -g
+# Toolchain
+CXX = clang++
+CC = clang
+CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -g -Wno-unused-parameter
+CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -g
 
 # LLVM flags (using llvm 18)
 LLVM_CONFIG = llvm-config-18
 # Compile C++ using LLVM
-LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags)
+# Use -isystem instead of -I to suppress warnings from LLVM headers
+LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-I/-isystem /g')
 # Link LLVM libs and POSIX libs
 LLVM_LDFLAGS  = $(shell $(LLVM_CONFIG) --ldflags --libs core native) \
-                $(shell $(LLVM_CONFIG) --system-libs)
+				$(shell $(LLVM_CONFIG) --system-libs)
 
 # Add rpath so danac finds libLLVM at runtime
 # This flag enables the user to run danac executable without LD_LIBRARY_PATH
@@ -45,35 +47,40 @@ PARSER_CPP = $(PARSER_DIR)/parser.tab.cc
 PARSER_HH = $(PARSER_DIR)/parser.tab.hh
 PARSER_LOC = $(PARSER_DIR)/location.hh
 
-# cpp source files
-SRCS := main.cpp \
-        $(AST_DIR)/ast.cpp \
-        $(AST_DIR)/ast_print.cpp \
-        $(SEMANTIC_DIR)/semantic.cpp \
-        $(SEMANTIC_DIR)/sema_context.cpp \
-        $(SEMANTIC_DIR)/diagnostics.cpp \
-        $(SYMBOL_DIR)/symbol.cpp \
-        $(SYMBOL_DIR)/symbol_table.cpp \
-        $(SYMBOL_DIR)/scope.cpp \
-        $(SYMBOL_DIR)/sematype.cpp \
-		$(BACKEND_DIR)/codegen/codegen_context.cpp \
-		$(BACKEND_DIR)/codegen/codegen_cond.cpp \
-		$(BACKEND_DIR)/codegen/codegen_expr.cpp \
-		$(BACKEND_DIR)/codegen/codegen_stmt.cpp \
-		$(BACKEND_DIR)/codegen/codegen_decl.cpp \
-		$(BACKEND_DIR)/codegen/codegen_loop.cpp \
-		$(BACKEND_DIR)/codegen/codegen_call.cpp \
-		$(RUNTIME_DIR)/danalib.cpp \
-        $(PARSER_CPP) \
-        $(LEXER_CPP)
-# object files
-OBJS := $(SRCS:.cpp=.o)
-
 # Default target
 all: $(TARGET)
 
+# cpp source files
+SRCS := main.cpp \
+		$(AST_DIR)/ast.cpp \
+		$(AST_DIR)/ast_print.cpp \
+		$(SEMANTIC_DIR)/semantic.cpp \
+		$(SEMANTIC_DIR)/sema_context.cpp \
+		$(SEMANTIC_DIR)/diagnostics.cpp \
+		$(SYMBOL_DIR)/symbol.cpp \
+		$(SYMBOL_DIR)/symbol_table.cpp \
+		$(SYMBOL_DIR)/scope.cpp \
+		$(SYMBOL_DIR)/sematype.cpp \
+		$(BACKEND_DIR)/codegen/codegen_context.cpp \
+		$(BACKEND_DIR)/codegen/codegen_call.cpp \
+		$(BACKEND_DIR)/codegen/codegen_cond.cpp \
+		$(BACKEND_DIR)/codegen/codegen_decl.cpp \
+		$(BACKEND_DIR)/codegen/codegen_expr.cpp \
+		$(BACKEND_DIR)/codegen/codegen_loop.cpp \
+		$(BACKEND_DIR)/codegen/codegen_stmt.cpp \
+		${RUNTIME_DIR}/danalib.cpp \
+		$(PARSER_CPP) \
+		$(LEXER_CPP)
+
+# build library of C functions
+runtime/lib.o: runtime/lib.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# object files
+OBJS := $(SRCS:.cpp=.o)
+
 # Link to LLVM and build main compiler executable
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) runtime/lib.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LLVM_LDFLAGS) $(LLVM_RPATH)
 
 # Compile source files
@@ -90,22 +97,18 @@ $(LEXER_CPP) $(LEXER_H): $(LEXER_DIR)/lexer.l
 
 # Clean intermediate files
 clean:
-	rm -f $(OBJS) $(TARGET) \
-	      $(PARSER_CPP) $(PARSER_HH) \
-	      $(LEXER_CPP) $(LEXER_H) \
-		  $(PARSER_LOC)
+	rm -f $(TEST_DIR)/*.imm \
+	rm -f $(TEST_DIR)/*.asm \
+	rm -f $(TEST_DIR)/*.o \
+	rm -f *.out \
+	rm -f runtime/lib.o \
+		$(OBJS) $(TARGET) \
+		$(PARSER_CPP) $(PARSER_HH) \
+		$(LEXER_CPP) $(LEXER_H) \
+		$(PARSER_LOC)
 
 # Clean everything including the executable
 distclean: clean
 	rm -f $(TARGET)
 
-# Test targets - using test programs from tests/ directory
-test: $(TARGET)
-	@echo "Testing with hello.dana..."
-	./$(TARGET) $(TEST_DIR)/hello.dana
-
-test-hanoi: $(TARGET)
-	@echo "Testing with hanoi.dana..."
-	./$(TARGET) $(TEST_DIR)/hanoi.dana
-
-.PHONY: all clean distclean test test-hanoi 
+.PHONY: all clean distclean 
