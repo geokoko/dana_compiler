@@ -119,7 +119,15 @@ llvm::Value* CodegenContext::lookupValue(const Symbol* sym) {
 	const auto& currentState = funcStack_.back();
 	auto localIt = currentState.localAddrs.find(sym);
 	if (localIt != currentState.localAddrs.end()) {
-		return localIt->second;
+		llvm::Value* val = localIt->second;
+		if (sym->getKind() == Symbol::SymKind::PARAM) {
+			const auto* paramSym = static_cast<const ParamSymbol*>(sym);
+			if (paramSym->getPass() == Symbol::ParamPass::BY_REF) {
+				// val is an alloca of a pointer (ptr*). We need to load the pointer (ptr).
+				return builder_->CreateLoad(builder_->getPtrTy(0), val, sym->getName() + ".ref");
+			}
+		}
+		return val;
 	}
 
 	// 2. Frame Walk (for captured variables or variables in parent scopes)
