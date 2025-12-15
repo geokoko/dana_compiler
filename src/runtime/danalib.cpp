@@ -218,34 +218,33 @@ void genBuiltins(SemContext& semCtx, CodegenContext& ctx) {
 	llvm::FunctionType* readByteTy  = llvm::FunctionType::get(i8Ty, {}, false);
 	llvm::FunctionType* readCharTy  = llvm::FunctionType::get(i8Ty, {}, false);
 
-	bind("writeInteger", llvm::Function::Create(writeIntTy,  llvm::Function::ExternalLinkage, "writeInteger", &mod));
-	bind("writeByte",    llvm::Function::Create(writeByteTy, llvm::Function::ExternalLinkage, "writeByte", &mod));
-	bind("writeChar",    llvm::Function::Create(writeCharTy, llvm::Function::ExternalLinkage, "writeChar", &mod));
-	bind("writeString",  llvm::Function::Create(writeStrTy,  llvm::Function::ExternalLinkage, "writeString", &mod));
+	bind("writeInteger", llvm::Function::Create(writeIntTy,  llvm::Function::ExternalLinkage, builtinTable[0].runtimeName, &mod));
+	bind("writeByte",    llvm::Function::Create(writeByteTy, llvm::Function::ExternalLinkage, builtinTable[1].runtimeName, &mod));
+	bind("writeChar",    llvm::Function::Create(writeCharTy, llvm::Function::ExternalLinkage, builtinTable[2].runtimeName, &mod));
+	bind("writeString",  llvm::Function::Create(writeStrTy,  llvm::Function::ExternalLinkage, builtinTable[3].runtimeName, &mod));
 
-	bind("readInteger", llvm::Function::Create(readIntTy,   llvm::Function::ExternalLinkage, "readInteger", &mod));
-	bind("readByte",    llvm::Function::Create(readByteTy,  llvm::Function::ExternalLinkage, "readByte", &mod));
-	bind("readChar",    llvm::Function::Create(readCharTy,  llvm::Function::ExternalLinkage, "readChar", &mod));
+	bind("readInteger", llvm::Function::Create(readIntTy,   llvm::Function::ExternalLinkage, builtinTable[4].runtimeName, &mod));
+	bind("readByte",    llvm::Function::Create(readByteTy,  llvm::Function::ExternalLinkage, builtinTable[5].runtimeName, &mod));
+	bind("readChar",    llvm::Function::Create(readCharTy,  llvm::Function::ExternalLinkage, builtinTable[6].runtimeName, &mod));
 
-	llvm::FunctionType* readStrTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx),
-	                                                       {i32Ty, ptrTy}, false);
-	bind("readString", llvm::Function::Create(readStrTy, llvm::Function::ExternalLinkage, "readString", &mod));
+	llvm::FunctionType* readStrTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {i32Ty, ptrTy}, false);
+	bind("readString", llvm::Function::Create(readStrTy, llvm::Function::ExternalLinkage, builtinTable[7].runtimeName, &mod));
 
 	llvm::FunctionType* extendTy = llvm::FunctionType::get(i32Ty, {i8Ty}, false);
-	bind("extend", llvm::Function::Create(extendTy, llvm::Function::ExternalLinkage, "extend", &mod));
+	bind("extend", llvm::Function::Create(extendTy, llvm::Function::ExternalLinkage, builtinTable[8].runtimeName, &mod));
 
 	llvm::FunctionType* shrinkTy = llvm::FunctionType::get(i8Ty, {i32Ty}, false);
-	bind("shrink", llvm::Function::Create(shrinkTy, llvm::Function::ExternalLinkage, "shrink", &mod));
+	bind("shrink", llvm::Function::Create(shrinkTy, llvm::Function::ExternalLinkage, builtinTable[9].runtimeName, &mod));
 
 	llvm::FunctionType* strlenTy = llvm::FunctionType::get(i32Ty, {ptrTy}, false);
-	bind("strlen", llvm::Function::Create(strlenTy, llvm::Function::ExternalLinkage, "strlen", &mod));
+	bind("strlen", llvm::Function::Create(strlenTy, llvm::Function::ExternalLinkage, builtinTable[10].runtimeName, &mod));
 
 	llvm::FunctionType* strcpyTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {ptrTy, ptrTy}, false);
-	bind("strcpy", llvm::Function::Create(strcpyTy, llvm::Function::ExternalLinkage, "strcpy", &mod));
+	bind("strcpy", llvm::Function::Create(strcpyTy, llvm::Function::ExternalLinkage, builtinTable[11].runtimeName, &mod));
 
 	llvm::FunctionType* strcatTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {ptrTy, ptrTy}, false);
-	bind("strcat", llvm::Function::Create(strcatTy, llvm::Function::ExternalLinkage, "strcat", &mod));
+	bind("strcat", llvm::Function::Create(strcatTy, llvm::Function::ExternalLinkage, builtinTable[12].runtimeName, &mod));
 
 	llvm::FunctionType* strcmpTy = llvm::FunctionType::get(i32Ty, {ptrTy, ptrTy}, false);
-	bind("strcmp", llvm::Function::Create(strcmpTy, llvm::Function::ExternalLinkage, "strcmp", &mod));
+	bind("strcmp", llvm::Function::Create(strcmpTy, llvm::Function::ExternalLinkage, builtinTable[13].runtimeName, &mod));
 }
