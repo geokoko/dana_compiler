@@ -21,170 +21,187 @@ void LLVMCodegen::gen(FuncDecl& n)  { (void)n; }
 /* ========== Program ========== */
 
 void LLVMCodegen::gen(Program& n) {
-	if (auto* def = n.definition()) {
-		def->agen(*this);
-	}
+    if (auto* def = n.definition()) {
+        def->agen(*this);
+    }
 }
 
 /* ========== Functions ========== */
 void LLVMCodegen::gen(FuncDef& n) {
-	/* Resolve function symbol */
-	auto* header  = n.funcHeader();
-	auto* funcSym = header ? header->symbol() : nullptr;
-	if (!funcSym) {
-		value = nullptr;
-		return;
-	}
+    /* 1. Resolve Function Symbol & Header */
+    auto* header = n.funcHeader();
+    auto* funcSym = header ? header->symbol() : nullptr;
+    if (!funcSym) {
+        value = nullptr;
+        return;
+    }
 
-	// Per-function frame info
-	auto* frameInfo = genCtx.createFrameInfo(funcSym);
+    /* 2. Optimization Analysis: Do we need a physical frame? */
+    bool needsFrame = false;
+    for (auto& defn : n.localDefs()) {
+        if (dynamic_cast<FuncDef*>(defn.get())) {
+            needsFrame = true;
+            break;
+        }
+    }
 
-	/* Determine parent frame type for static link (not needed for layout, kept for clarity) */
-	llvm::StructType* parentFrameTy = nullptr;
-	if (auto* parentSym = funcSym->definingFunc()) {
-		if (const auto* parentInfo = genCtx.getFrameInfo(parentSym)) {
-			parentFrameTy = parentInfo->getFrameType();
-		}
-	}
+    auto* frameInfo = genCtx.createFrameInfo(funcSym);
 
-	/* Build frame layout */
-	std::vector<llvm::Type*> paramTys;
-	std::vector<llvm::Type*> localTys;
+    /* 3. Prepare Type Definitions */
+    std::vector<llvm::Type*> paramTys;
+    for (const auto& p : funcSym->getParams()) {
+        const bool byRef = p->getPass() == Symbol::ParamPass::BY_REF;
+        llvm::Type* ty = byRef ? llvm::PointerType::get(genCtx.llvmContext(), 0) 
+            : genCtx.getLLVMType(*p->getType(), /*forParam=*/true);
+        paramTys.push_back(ty);
+    }
 
-	// Field 0: static link
-	llvm::Type* staticLinkTy = llvm::PointerType::get(genCtx.llvmContext(), 0);
+    bool needsStaticLink = funcSym->definingFunc() != nullptr;
+    llvm::Type* staticLinkTy = llvm::PointerType::get(genCtx.llvmContext(), 0);
 
-	std::size_t fieldIndex = 1; // 0 reserved for static link
+    /* 4. Build LLVM Function Signature */
+    std::vector<llvm::Type*> fnArgTypes;
+    if (needsStaticLink) {
+        fnArgTypes.push_back(staticLinkTy);
+    }
+    fnArgTypes.insert(fnArgTypes.end(), paramTys.begin(), paramTys.end());
 
-	// Parameters
-	for (const auto& p : funcSym->getParams()) {
-		const bool byRef = p->getPass() == Symbol::ParamPass::BY_REF;
-		llvm::Type* slotTy = nullptr;
+    auto* sig = static_cast<const FuncType*>(funcSym->getType().get());
+    llvm::Type* retTy = (sig && sig->returnType()) ? genCtx.getLLVMType(*sig->returnType()) 
+        : llvm::Type::getVoidTy(genCtx.llvmContext());
 
-		if (byRef) {
-			slotTy = llvm::PointerType::get(genCtx.llvmContext(), 0);
-		} else {
-			slotTy = genCtx.getLLVMType(*p->getType(), /*forParam=*/true);
-		}
+    auto* llvmFnTy = llvm::FunctionType::get(retTy, fnArgTypes, /*isVarArg=*/false);
 
-		paramTys.push_back(slotTy);
-		frameInfo->captureVar(p.get(), fieldIndex++);
-	}
+    /* 5. Create or Lookup LLVM Function */
+    llvm::Function* llvmFunc = genCtx.lookupFunction(funcSym);
+    if (!llvmFunc) {
+        llvmFunc = llvm::Function::Create(llvmFnTy, llvm::GlobalValue::ExternalLinkage, 
+                                    funcSym->getName(), &genCtx.llvmModule());
+        genCtx.bindFunction(funcSym, llvmFunc);
+    }
 
-	// Local variables
-	for (auto& def : n.localDefs()) {
-		if (auto* var = dynamic_cast<VarDef*>(def.get())) {
-			for (auto* sym : var->symbols()) {
-				localTys.push_back(genCtx.getLLVMType(*sym->getType()));
-				frameInfo->captureVar(sym, fieldIndex++);
-			}
-		}
-	}
-
-	// Create or update frame struct type
-	if (!frameInfo->getFrameType()) {
-		frameInfo->setFrameType(llvm::StructType::create(genCtx.llvmContext(), funcSym->getName() + ".frame"));
-	}
-	auto* frameTy = frameInfo->getFrameType();
-
-	std::vector<llvm::Type*> fieldTys;
-	fieldTys.reserve(1 + paramTys.size() + localTys.size());
-	fieldTys.push_back(staticLinkTy);
-	fieldTys.insert(fieldTys.end(), paramTys.begin(), paramTys.end());
-	fieldTys.insert(fieldTys.end(), localTys.begin(), localTys.end());
-
-	if (frameTy->isOpaque()) {
-		frameTy->setBody(fieldTys, /*isPacked=*/false);
-	}
-
-	// Build function type
-	auto* sig = static_cast<const FuncType*>(funcSym->getType().get());
-	llvm::Type* retTy = sig && sig->returnType() ? genCtx.getLLVMType(*sig->returnType()) : llvm::Type::getVoidTy(genCtx.llvmContext());
-
-	std::vector<llvm::Type*> fnParamTypes;
-	bool needsStaticLink = funcSym->definingFunc() != nullptr;
-	if (needsStaticLink) {
-		fnParamTypes.push_back(staticLinkTy);
-	}
-	fnParamTypes.insert(fnParamTypes.end(), paramTys.begin(), paramTys.end());
-
-	auto* llvmFnTy = llvm::FunctionType::get(retTy, fnParamTypes, /*isVarArg=*/false);
-
-	// Create or reuse LLVM function
-	llvm::Function* llvmFunc = genCtx.lookupFunction(funcSym);
-	if (!llvmFunc) {
-		llvmFunc = llvm::Function::Create(llvmFnTy, llvm::GlobalValue::ExternalLinkage, funcSym->getName(), &genCtx.llvmModule());
-		genCtx.bindFunction(funcSym, llvmFunc);
-	}
-
-	// Generate nested functions first
-	for (auto& def : n.localDefs()) {
+    /* 6. Generate Nested Functions First (Recursion) */
+    for (auto& def : n.localDefs()) {
         if (auto* nestedFunc = dynamic_cast<FuncDef*>(def.get())) {
             nestedFunc->agen(*this);
         }
     }
 
-	// Entry block + frame allocation
-	auto* entry = llvm::BasicBlock::Create(genCtx.llvmContext(), "entry", llvmFunc);
-	genCtx.builder().SetInsertPoint(entry);
+    /* 7. Begin Function Generation */
+    auto* entry = llvm::BasicBlock::Create(genCtx.llvmContext(), "entry", llvmFunc);
+    genCtx.builder().SetInsertPoint(entry);
 
-	auto* framePtr = genCtx.builder().CreateAlloca(frameTy, nullptr, funcSym->getName() + ".frame");
+    auto argIt = llvmFunc->arg_begin();
+    llvm::Value* incomingStaticLink = nullptr;
 
-	// Enter function context
-	genCtx.enterFunction(funcSym, framePtr);
+    if (needsStaticLink) {
+        incomingStaticLink = &*argIt++;
+        incomingStaticLink->setName("staticlink.in");
+    }
 
-	/* Bind static link (if we need one) and parameters to frame fields */
-	auto argIt = llvmFunc->arg_begin();
+    // PATH A: Nested Children Exist -> Create Physical Stack Frame (Struct)
+    if (needsFrame) {
+        std::vector<llvm::Type*> structFields;
+        structFields.push_back(staticLinkTy); // Field 0: Static Link
 
-	if (needsStaticLink) {
-		argIt->setName("staticlink.arg");
-		llvm::Value* staticLinkArg = &*argIt++;
-		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr, 0, "staticlink.ptr");
-		genCtx.builder().CreateStore(staticLinkArg, staticLinkPtr);
-	} else {
-		llvm::Value* staticLinkPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr, 0, "staticlink.ptr");
-		auto* ptrTy = llvm::cast<llvm::PointerType>(staticLinkTy);
-		llvm::Value* nullPtr = llvm::ConstantPointerNull::get(ptrTy);
-		genCtx.builder().CreateStore(nullPtr, staticLinkPtr);
-	}
+        size_t fieldIndex = 1;
 
-	// Bind parameters into the frame fields
-	for (const auto& p : funcSym->getParams()) {
-		auto idxOpt = frameInfo->getCapturedVarIndex(p.get());
-		assert(idxOpt.has_value());
-		std::size_t idx = *idxOpt;
+        // Add Parameters
+        for (const auto& p : funcSym->getParams()) {
+            structFields.push_back(paramTys[fieldIndex - 1]);
+            frameInfo->capturedIndices[p] = fieldIndex++;
+        }
 
-		llvm::Value* paramArg = &*argIt++;
-		llvm::Value* paramPtr = genCtx.builder().CreateStructGEP(frameTy, framePtr, idx, p->getName() + ".ptr");
-		genCtx.builder().CreateStore(paramArg, paramPtr);
-	}
+        // Add Locals
+        for (auto& def : n.localDefs()) {
+            if (auto* var = dynamic_cast<VarDef*>(def.get())) {
+                for (auto* sym : var->symbols()) {
+                    structFields.push_back(genCtx.getLLVMType(*sym->getType()));
+                    frameInfo->capturedIndices[sym] = fieldIndex++;
+                }
+            }
+        }
 
-	// Locals: only slots in the frame (remove GEP from here, used during lookup for local usage)
-	for (auto& def : n.localDefs()) {
-		if (auto* var = dynamic_cast<VarDef*>(def.get())) {
-			for (auto* sym : var->symbols()) {
-				auto idxOpt = frameInfo->getCapturedVarIndex(sym);
-				assert(idxOpt.has_value());
-				(void)idxOpt;
-			}
-		}
-	}
+        llvm::StructType* frameStructTy = llvm::StructType::create(genCtx.llvmContext(), structFields, funcSym->getName() + ".frame");
+        frameInfo->frameTy = frameStructTy;
 
-	/* Generate function body */
-	if (n.funcBody()) {
-		n.funcBody()->agen(*this);
-	}
+        auto* framePtr = genCtx.builder().CreateAlloca(frameStructTy, nullptr, funcSym->getName() + ".frame");
+        genCtx.enterFunction(funcSym, framePtr, incomingStaticLink);
 
-	/* Default return if none emitted */
-	llvm::BasicBlock* curBB = genCtx.builder().GetInsertBlock();
-	if (curBB && !curBB->getTerminator()) {
-		if (retTy->isVoidTy()) {
-			genCtx.builder().CreateRetVoid();
-		} else {
-			genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
-		}
-	}
+        // Store Static Link
+        llvm::Value* slPtr = genCtx.builder().CreateStructGEP(frameStructTy, framePtr, 0, "staticlink.ptr");
+        if (incomingStaticLink) {
+            genCtx.builder().CreateStore(incomingStaticLink, slPtr);
+        } else {
+            genCtx.builder().CreateStore(llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(staticLinkTy)), slPtr);
+        }
 
-	genCtx.leaveFunction();
-	value = nullptr;
+        // Store Parameters
+        for (const auto& p : funcSym->getParams()) {
+            llvm::Value* argVal = &*argIt++;
+            argVal->setName(p->getName());
+            
+            auto idx = frameInfo->capturedIndices[p];
+            // assert(idxOpt.has_value());
+            llvm::Value* paramGEP = genCtx.builder().CreateStructGEP(frameStructTy, framePtr, idx, p->getName() + ".ptr");
+            genCtx.builder().CreateStore(argVal, paramGEP);
+            genCtx.bindLocal(p, paramGEP);
+        }
+
+        // Bind Locals
+        for (auto& def : n.localDefs()) {
+            if (auto* var = dynamic_cast<VarDef*>(def.get())) {
+                for (auto* sym : var->symbols()) {
+                    auto idx = frameInfo->capturedIndices[sym];
+                    llvm::Value* localGEP = genCtx.builder().CreateStructGEP(frameStructTy, framePtr, idx, sym->getName() + ".ptr");
+                    genCtx.bindLocal(sym, localGEP);
+                }
+            }
+        }
+    }
+    // PATH B: Leaf Function -> Flat Optimization
+    else {
+        // No physical frame, but we still track static link for logic
+        genCtx.enterFunction(funcSym, nullptr, incomingStaticLink);
+
+        // Individual Allocas for Parameters
+        for (const auto& p : funcSym->getParams()) {
+            llvm::Value* argVal = &*argIt++;
+            argVal->setName(p->getName());
+
+            llvm::AllocaInst* allocaInst = genCtx.builder().CreateAlloca(argVal->getType(), nullptr, p->getName() + ".addr");
+            genCtx.builder().CreateStore(argVal, allocaInst);
+            genCtx.bindLocal(p, allocaInst);
+        }
+
+        // Individual Allocas for Locals
+        for (auto& def : n.localDefs()) {
+            if (auto* var = dynamic_cast<VarDef*>(def.get())) {
+                for (auto* sym : var->symbols()) {
+                    llvm::Type* ty = genCtx.getLLVMType(*sym->getType());
+                    llvm::AllocaInst* allocaInst = genCtx.builder().CreateAlloca(ty, nullptr, sym->getName());
+                    genCtx.bindLocal(sym, allocaInst);
+                }
+            }
+        }
+    }
+
+    /* 8. Generate Function Body */
+    if (n.funcBody()) {
+        n.funcBody()->agen(*this);
+    }
+
+    /* 9. Ensure Terminator */
+    llvm::BasicBlock* curBB = genCtx.builder().GetInsertBlock();
+    if (curBB && !curBB->getTerminator()) {
+        if (retTy->isVoidTy()) {
+            genCtx.builder().CreateRetVoid();
+        } else {
+            genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
+        }
+    }
+
+    /* 10. Cleanup */
+    genCtx.leaveFunction();
+    value = nullptr;
 }
