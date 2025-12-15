@@ -4,7 +4,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -21,90 +20,97 @@
 #include "../../frontend/symbol/symbol.hpp"
 #include "../../frontend/symbol/sematype.hpp"
 
-/* CodegenContext holds all LLVM state needed while generating IR for a Dana Program */
-
-class CodegenContext {
-public:
-	/* Frame logic */
-	class FrameInfo {
-	public:
-		FrameInfo() = default;
-		~FrameInfo() = default;
-		/* Frame layout information */
-		void setFrameType(llvm::StructType* frameType);
-		llvm::StructType* getFrameType();
-		llvm::StructType* getFrameType() const;
-
-		/* Symbol to LLVM value mapping */
-		void captureVar(const Symbol* sym, std::size_t index);
-		std::optional<std::size_t> getCapturedVarIndex(const Symbol* sym) const;
-
-		/* Loop control */
-		void pushLoop(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB);
-		void popLoop();
-		llvm::BasicBlock* currentBreakTarget() const;
-		llvm::BasicBlock* currentContinueTarget() const;
-
-	private:
-		llvm::StructType* frameTy = nullptr; // LLVM struct type representing the frame layout
-		std::unordered_map<const Symbol*, llvm::Value*> valueMap_; // symbol to LLVM value mapping for locals in this frame
-		std::unordered_map<const Symbol*, std::size_t> capturedVars; // locals mapping to their indices in the frame
-		
-		/* Storage of loop targets */
-		std::vector<llvm::BasicBlock*> breakTargets;
-		std::vector<llvm::BasicBlock*> continueTargets;
-	};
-
+class CodegenContext { 
 private:
-	std::unique_ptr<llvm::LLVMContext> ownedCtx_;
-	std::unique_ptr<llvm::Module> module_;
-	std::unique_ptr<llvm::IRBuilder<>> builder_;
-	
-	/* Mapping of Dana function symbols to LLVM entities */
-	std::unordered_map<const FuncSymbol*, llvm::Function*> functionMap_;
-	std::unordered_map<const FuncSymbol*, std::unique_ptr<FrameInfo>> frameMap_;
-	/* Stack of active functions (with their frame pointer) for nested function generation */
-	std::vector<std::pair<const FuncSymbol*, llvm::Value*>> frameStack_;
+    std::unique_ptr<llvm::LLVMContext> ownedCtx_;
+    std::unique_ptr<llvm::Module> module_;
+    std::unique_ptr<llvm::IRBuilder<>> builder_;
 
-	/* Current function being generated */
-	const FuncSymbol* currentFunc_ = nullptr;
-	llvm::Value* currentFramePtr_ = nullptr;
+	/* 
+     * FrameInfo:
+     * Represents the "Permanent Layout" of a function's stack frame.
+     * This persist across multiple calls to the same function.
+     */
+    struct FrameInfo {
+        /* Frame layout information fields */
+		// Struct type representing the frame layout
+		// if function has no child functions, this is nullptr
+		// otherwise, this is an actual StructType
+        llvm::StructType* frameTy = nullptr;
+		// Map of captured variables to their indices in the frame
+        std::unordered_map<const Symbol*, unsigned> capturedIndices;
+    };
+
+    /* 
+     * ActiveFuncState:
+     * Tracks the execution state of the function currently being compiled.
+     */
+    struct ActiveFuncState {
+        const FuncSymbol* funcSym;
+        llvm::Value* framePtr;   // Pointer to the current function's frame (null for leaf functions)
+        llvm::Value* staticLink; // Explicit static link to parent frame
+
+        // Transient locals: variables living in registers or allocas (Path B)
+        std::unordered_map<const Symbol*, llvm::Value*> localAddrs;
+
+        // Loop control stack for the current function scope
+        struct LoopInfo {
+            llvm::BasicBlock* breakBB;
+            llvm::BasicBlock* continueBB;
+        };
+        std::vector<LoopInfo> loopStack;
+    };
+
+    /* Stack of active functions for nested function generation */
+    std::vector<ActiveFuncState> funcStack_;
+
+    /* Frame Layout Definitions */
+    std::unordered_map<const FuncSymbol*, std::unique_ptr<FrameInfo>> frameLayouts_;
+
+    /* Generated Functions Cache */
+    std::unordered_map<const FuncSymbol*, llvm::Function*> llvmFunctions_;
 
 public:
-	// Constructor of LLVMContext
-	explicit CodegenContext(const std::string& moduleName);
+    explicit CodegenContext(const std::string& moduleName);
+    ~CodegenContext() = default;
 
-	// Getters of LLVM core objects
-	llvm::LLVMContext& llvmContext() { return *ownedCtx_; }
-	const llvm::LLVMContext& llvmContext() const { return *ownedCtx_; }
-	llvm::Module& llvmModule()       { return *module_; }
-	const llvm::Module& llvmModule() const { return *module_; }
-	llvm::IRBuilder<>& builder()     { return *builder_; }
-	const llvm::IRBuilder<>& builder() const { return *builder_; }
+    // LLVM Core Accessors
+    llvm::LLVMContext& llvmContext() { return *ownedCtx_; }
+    const llvm::LLVMContext& llvmContext() const { return *ownedCtx_; }
+    llvm::Module& llvmModule()       { return *module_; }
+    const llvm::Module& llvmModule() const { return *module_; }
+    llvm::IRBuilder<>& builder()     { return *builder_; }
+    const llvm::IRBuilder<>& builder() const { return *builder_; }
 
-	/* Semantic Type to LLVM type translation
-	 * Type translation to an LLVM type. 
-	 * If forParam is true, unsized arrays/by-ref params decay to pointers.
-	 * */
-	llvm::Type* getLLVMType(const SemaType& ty, bool forParam = false);
+    // Type Translation
+    llvm::Type* getLLVMType(const SemaType& ty, bool forParam = false);
 
-	/* FrameInfo management */
-	FrameInfo* createFrameInfo(const FuncSymbol* fn);
-	const FrameInfo* getFrameInfo(const FuncSymbol* fn) const;
-	FrameInfo* getFrameInfo(const FuncSymbol* fn);
+    // Function Registry
+    llvm::Function* lookupFunction(const FuncSymbol* sym) const;
+    void bindFunction(const FuncSymbol* sym, llvm::Function* fn);
 
-	/* Dana Symbol to LLVM value translation */
-	llvm::Value* lookupValue(const Symbol* sym);
-	llvm::Function* lookupFunction(const FuncSymbol* sym) const;
-	llvm::Function* getLLVMFunction(const FuncSymbol* fn);
-	void bindFunction(const FuncSymbol* sym, llvm::Function* fn);
+    // Frame Info Management
+    FrameInfo* createFrameInfo(const FuncSymbol* fn);
+    const FrameInfo* getFrameInfo(const FuncSymbol* fn) const;
+    FrameInfo* getFrameInfo(const FuncSymbol* fn);
 
-	// Track the function currently being generated and its frame pointer.
-	void enterFunction(const FuncSymbol* fn, llvm::Value* framePtr);
-	void leaveFunction();
+    // Scope / Function Entry & Exit
+    void enterFunction(const FuncSymbol* fn, llvm::Value* framePtr, llvm::Value* staticLink);
+    void leaveFunction();
 
-	const FuncSymbol* currentFunc() const;
-	FrameInfo* currentFrameInfo();
-	const FrameInfo* currentFrameInfo() const;
-	llvm::Value* currentFramePtr() const;
+    // Helper Methods
+    void bindLocal(const Symbol* sym, llvm::Value* val);
+    void bindStaticLink(llvm::Value* link);
+    llvm::Value* lookupValue(const Symbol* sym);
+
+    // Loop Control
+    void pushLoop(llvm::BasicBlock* breakBB, llvm::BasicBlock* continueBB);
+    void popLoop();
+    llvm::BasicBlock* currentBreakTarget() const;
+    llvm::BasicBlock* currentContinueTarget() const;
+
+    // Current State Accessors
+    const FuncSymbol* currentFunc() const;
+    llvm::Value* currentFramePtr() const;
+    llvm::Value* currentStaticLink() const;
 };

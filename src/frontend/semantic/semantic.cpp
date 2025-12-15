@@ -356,7 +356,6 @@ void VarDef::sem(SemContext& context) {
 void FuncDecl::sem(SemContext& context) {
 	header->sem(context);
 	auto info = context.takeHeaderInfo();
-	std::cout << "FuncDecl::sem: processing declaration of " << (info ? info->name : "<invalid>") << "\n";
 	if (!info) {
 		return;
 	}
@@ -442,7 +441,7 @@ void FuncDef::sem(SemContext& context) {
 	context.declareSymbol(std::move(func));
 	
 	auto* fsym = static_cast<FuncSymbol*>(symbol);
-	symbol->setDefiningFunc(fsym);
+	symbol->setDefiningFunc(context.currentFunction() ? static_cast<FuncSymbol*>(context.currentFunction()->symbol) : nullptr);
 	header->setSymbol(fsym);
 
 	context.openScope();
@@ -460,7 +459,7 @@ void FuncDef::sem(SemContext& context) {
 		sym->setDefiningFunc(fsym);
 		auto result = context.declareSymbol(std::move(sym));
 		if (result.symbol) {
-			func->addParam(static_cast<ParamSymbol*>(result.symbol));
+			fsym->addParam(static_cast<ParamSymbol*>(result.symbol));
 		}
 	}
 
@@ -472,6 +471,7 @@ void FuncDef::sem(SemContext& context) {
 
 	if (body) {
 		body->sem(context);
+	} else {
 	}
 
 	bool needsReturn = false;
