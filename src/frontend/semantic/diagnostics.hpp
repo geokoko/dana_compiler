@@ -43,6 +43,7 @@ public:
 	bool hasErrors() const;
 	const std::vector<Entry>& entries() const;
 	void printAll() const;
+	void clearDiags();
 
 private:
 	std::vector<Entry> messages_;

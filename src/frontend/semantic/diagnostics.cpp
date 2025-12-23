@@ -48,3 +48,6 @@ void Diagnostics::printAll() const {
 	}
 }
 
+void Diagnostics::clearDiags() {
+	messages_.clear();
+}

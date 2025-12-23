@@ -273,8 +273,37 @@ bool checkArguments(vec<up<Expr>>& args,
 // Each sem() function performs semantic checks and type resolution
 
 void Program::sem(SemContext& context) {
-	if (top) {
-		top->sem(context);
+	if (!top) {
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
+		                       SourceLoc::builtin(), "missing top level function definition");
+		return;
+	}
+
+	top->sem(context);
+
+	auto* header = top->funcHeader();
+	if (!header) {
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
+		                       top->loc, "missing top level function header");
+		return;
+	}
+
+	// check for main function semantic correctness
+	FuncSymbol* main_sym = header->symbol();
+	if (!main_sym) {
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
+		                       header->loc, "failed to resolve top level function symbol");
+		return;
+	}
+	// main cannot have a return type
+	if (!main_sym->isProcedure()) {
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, header->loc,
+						 "Top level function must be a procedure");
+	}
+	// main cannot have parameters
+	if (!main_sym->getParams().empty()) {
+		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, header->loc,
+						 "Top level function cannot have parameters");
 	}
 }
 
@@ -307,7 +336,8 @@ void Header::sem(SemContext& context) {
 		}
 		const auto* typeNode = param->parameterType();
 		if (!typeNode) {
-		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, param->loc, "missing parameter type");
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, 
+						  param->loc, "missing parameter type");
 			continue;
 		}
 
