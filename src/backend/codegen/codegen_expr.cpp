@@ -36,7 +36,7 @@ void LLVMCodegen::gen(FalseConst& n) {
 void LLVMCodegen::gen(LValueExpr& n) {
 	llvm::Value* addr = nullptr;
 	if (auto* lv = n.lvalue()) {
-		lv->agen(*this);
+		lv->accept(*this);
 		addr = value;
 	}
 	if (!addr) {
@@ -49,7 +49,7 @@ void LLVMCodegen::gen(LValueExpr& n) {
 
 void LLVMCodegen::gen(ParenExpr& n) {
 	if (auto* inner = n.innerExpr()) {
-		inner->agen(*this);
+		inner->accept(*this);
 	} else {
 		value = nullptr;
 	}
@@ -58,7 +58,7 @@ void LLVMCodegen::gen(ParenExpr& n) {
 void LLVMCodegen::gen(UnaryExpr& n) {
 	llvm::Value* operand = nullptr;
 	if (auto* expr = n.operandExpr()) {
-		expr->agen(*this);
+		expr->accept(*this);
 		operand = value;
 	}
 	if (!operand) {
@@ -83,11 +83,11 @@ void LLVMCodegen::gen(BinaryExpr& n) {
 	llvm::Value* lhs = nullptr;
 	llvm::Value* rhs = nullptr;
 	if (auto* left = n.leftExpr()) {
-		left->agen(*this);
+		left->accept(*this);
 		lhs = value;
 	}
 	if (auto* right = n.rightExpr()) {
-		right->agen(*this);
+		right->accept(*this);
 		rhs = value;
 	}
 	if (!lhs || !rhs) {
@@ -152,7 +152,7 @@ void LLVMCodegen::gen(StringLiteralLVal& n) {
 void LLVMCodegen::gen(IndexLVal& n) {
 	llvm::Value* basePtr = nullptr;
 	if (auto* base = n.baseExpr()) {
-		base->agen(*this);
+		base->accept(*this);
 		basePtr = value;
 	}
 	if (!basePtr) {
@@ -162,7 +162,7 @@ void LLVMCodegen::gen(IndexLVal& n) {
 
 	llvm::Value* indexVal = nullptr;
 	if (auto* idx = n.indexExpr()) {
-		idx->agen(*this);
+		idx->accept(*this);
 		indexVal = value;
 	}
 	if (!indexVal) {

@@ -5,6 +5,7 @@
 #include "./frontend/ast/ast.hpp"
 #include "./frontend/parser/parser.tab.hh"
 #include "./frontend/semantic/diagnostics.hpp"
+#include "./frontend/semantic/semantic.hpp"
 #include "./frontend/semantic/sema_context.hpp"
 #include "./frontend/symbol/symbol_table.hpp"
 #include "./backend/codegen/codegen_context.hpp"
@@ -112,7 +113,8 @@ int main(int argc, char** argv) {
 	SemContext semCtx(symtab, diags);
 	declareBuiltins(semCtx);
 
-	ast_root->sem(semCtx);
+	runSemanticPass(*ast_root, semCtx);
+	runControlFlowPass(*ast_root, semCtx);
 
 	if (semCtx.hasErrors()) {
 		semCtx.printDiagnostics();
@@ -123,7 +125,7 @@ int main(int argc, char** argv) {
 	CodegenContext codegenCtx("dana_module");
 	genBuiltins(semCtx, codegenCtx);
 	LLVMCodegen generate(codegenCtx);
-	ast_root->agen(generate);
+	ast_root->accept(generate);
 
 	Optimizer optimizer;
 	optimizer.optimize(codegenCtx.llvmModule(), optLevel);

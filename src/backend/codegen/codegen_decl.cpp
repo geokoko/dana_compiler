@@ -22,7 +22,7 @@ void LLVMCodegen::gen(FuncDecl& n)  { (void)n; }
 
 void LLVMCodegen::gen(Program& n) {
     if (auto* def = n.definition()) {
-        def->agen(*this);
+        def->accept(*this);
     }
 }
 
@@ -83,7 +83,7 @@ void LLVMCodegen::gen(FuncDef& n) {
     /* 6. Generate Nested Functions First (Recursion) */
     for (auto& def : n.localDefs()) {
         if (auto* nestedFunc = dynamic_cast<FuncDef*>(def.get())) {
-            nestedFunc->agen(*this);
+            nestedFunc->accept(*this);
         }
     }
 
@@ -188,7 +188,7 @@ void LLVMCodegen::gen(FuncDef& n) {
 
     /* 8. Generate Function Body */
     if (n.funcBody()) {
-        n.funcBody()->agen(*this);
+        n.funcBody()->accept(*this);
     }
 
     /* 9. Ensure Terminator */

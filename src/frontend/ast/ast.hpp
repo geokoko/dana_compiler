@@ -18,8 +18,7 @@ using std::move;
 template <class T> using up = std::unique_ptr<T>;
 template <class T> using vec = std::vector<T>;
 
-class SemContext;
-class Codegen;
+class AstVisitor;
 class Symbol;
 class FuncSymbol;
 class VarSymbol;
@@ -30,8 +29,7 @@ public:
     SourceLoc loc;
     explicit ASTNode(SourceLoc loc);
     virtual ~ASTNode() = 0;
-    virtual void sem(SemContext& context) = 0;
-    virtual void agen(Codegen& v) = 0;
+    virtual void accept(AstVisitor& v) = 0;
     virtual void print(std::ostream &out) const = 0;
 };
 
@@ -52,7 +50,6 @@ class Expr : public ASTNode {
 public:
     explicit Expr(SourceLoc loc);
     virtual ~Expr();
-    virtual void sem(SemContext& context) override = 0;
     virtual void print(std::ostream &out) const override = 0;
 	SemaTypePtr type() const;
 	void setType(SemaTypePtr type);
@@ -74,7 +71,6 @@ class Stmt : public ASTNode {
 public:
     explicit Stmt(SourceLoc l);
     virtual ~Stmt() override;
-    void sem(SemContext& context) override = 0;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -83,7 +79,6 @@ class Lval : public ASTNode {
 public:
     explicit Lval(SourceLoc l);
     virtual ~Lval() override;
-    void sem(SemContext& context) override = 0;
     virtual void print(std::ostream& out) const override = 0;
 	SemaTypePtr type() const;
 	void setType(SemaTypePtr type);
@@ -99,7 +94,6 @@ class Rval : public Expr {
 public:
     explicit Rval(SourceLoc l);
     virtual ~Rval() override = default;
-    void sem(SemContext& context) override = 0;
     virtual void print(std::ostream& out) const override = 0;
 };
 
@@ -115,10 +109,8 @@ public:
     virtual ~Type() override = default;
 	DataType data_type() const;
     const vec<std::optional<int>>& dimensions() const;
-
-    virtual void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     virtual void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 };
 
 class FParType : public Type {
@@ -127,9 +119,8 @@ public:
     FParType(SourceLoc l, bool ref, DataType type, vec<std::optional<int>> d);
 
 	bool isByRef() const;
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 private:
     bool by_ref;
 };
@@ -138,9 +129,8 @@ private:
 class Block : public ASTNode {
 public:
     Block(SourceLoc l, vec<up<Stmt>> stmts);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     const vec<up<Stmt>>& statementsList() const { return statements; }
 private:
     vec<up<Stmt>> statements;
@@ -150,7 +140,6 @@ private:
 class Def : public ASTNode {
 public:
     explicit Def(SourceLoc l);
-    virtual void sem(SemContext& context) override = 0;
     void print(std::ostream& out) const override;
 };
 
@@ -159,9 +148,8 @@ class FuncDef;
 class Program : public ASTNode {
 public:
     Program(SourceLoc l, up<FuncDef> d);
-	void sem(SemContext& context) override;
+	void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     FuncDef* definition() const { return top.get(); }
 private:
     up<FuncDef> top;
@@ -172,11 +160,11 @@ private:
 class FParDef : public Def {
 public:
     FParDef(SourceLoc l, vec<string> names, up<FParType> t);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
 	const vec<string>& names() const;
+	FParType* parameterType() { return type.get(); }
 	const FParType* parameterType() const;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 private:
     vec<string> identifiers;
 	up<FParType> type;
@@ -186,14 +174,13 @@ class Header : public Def {
 public:
     Header(SourceLoc l, string n, optional<DataType> r, vec<up<FParDef>> p);
 
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
 	const string& identifier() const;
 	const vec<up<FParDef>>& parameters() const;
 	optional<DataType> returnType() const;
     FuncSymbol* symbol() const { return symbol_; }
     void setSymbol(FuncSymbol* sym) { symbol_ = sym; }
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 private:
     string name;
     optional<DataType> return_type;
@@ -211,22 +198,22 @@ private:
 public:
     VarDef(SourceLoc l, vec<string> ids, up<Type> t);
 
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
+    vec<VarSymbol*>& symbols() { return symbols_; }
     const vec<VarSymbol*>& symbols() const { return symbols_; }
     const vec<string>& identifiers() const { return names; }
+    Type* declaredType() { return declared_type.get(); }
     const Type* declaredType() const { return declared_type.get(); }
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 };
 
 class FuncDecl : public Def {
 public:
     explicit FuncDecl(SourceLoc l, up<Header> h);
 
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     Header* funcHeader() const { return header.get(); }
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 private:
     up<Header> header;
 };
@@ -235,12 +222,11 @@ class FuncDef : public Def {
 public:
     FuncDef(SourceLoc l, up<Header> h, vec<up<Def>> defs, up<Block> b);
 
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     Header* funcHeader() const { return header.get(); }
     const vec<up<Def>>& localDefs() const { return locals; }
     Block* funcBody() const { return body.get(); }
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 private:
     up<Header> header;
     vec<up<Def>> locals;
@@ -252,25 +238,22 @@ private:
 class SkipStmt : public Stmt {
 public:
     explicit SkipStmt(SourceLoc l);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 };
 
 class ExitStmt : public Stmt {
 public:
     explicit ExitStmt(SourceLoc l);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 };
 
 class AssignStmt : public Stmt {
 public:
     AssignStmt(SourceLoc l, up<Lval> left, up<Expr> right);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     Lval* left() const { return lhs.get(); }
     Expr* right() const { return rhs.get(); }
 private:
@@ -282,8 +265,7 @@ class ReturnStmt : public Stmt {
 public:
     ReturnStmt(SourceLoc l, up<Expr> expr);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     Expr* returnValue() const { return value.get(); }
 private:
     up<Expr> value;
@@ -295,8 +277,7 @@ public:
     Symbol* symbol() const { return symbol_; }
     void setSymbol(Symbol* sym) { symbol_ = sym; }
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     const string& identifier() const { return name; }
     const vec<up<Expr>>& arguments() const { return args; }
 private:
@@ -310,8 +291,7 @@ class BreakStmt : public Stmt {
 public:
     BreakStmt(SourceLoc l, optional<string> lbl);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     const optional<string>& loopLabel() const { return label; }
 private:
     optional<string> label;
@@ -321,8 +301,7 @@ class ContinueStmt : public Stmt {
 public:
     ContinueStmt(SourceLoc l, optional<string> lbl);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     const optional<string>& loopLabel() const { return label; }
 private:
     optional<string> label;
@@ -338,8 +317,7 @@ public:
            vec<std::pair<up<Cond>, up<Block>>> elifs,
            std::optional<up<Block>> else_block);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     Cond* conditionExpr() const { return condition.get(); }
     Block* thenBlock() const { return then_branch.get(); }
     const vec<std::pair<up<Cond>, up<Block>>>& elifs() const { return elif_branches; }
@@ -359,8 +337,7 @@ private:
 public:
     LoopStmt(SourceLoc l, std::optional<string> lbl, up<Block> blk);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     const optional<string>& loopLabel() const { return label; }
     Block* loopBody() const { return body.get(); }
 };
@@ -373,8 +350,8 @@ public:
     Symbol* symbol() const { return symbol_; }
     void setSymbol(Symbol* sym) { symbol_ = sym; }
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
+    const string& identifier() const { return name; }
 private:
     string name;
 	// store associated symbol
@@ -385,8 +362,7 @@ class StringLiteralLVal : public Lval {
 public:
     StringLiteralLVal(SourceLoc l, string v);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     const string& literal() const { return value; }
 private:
     string value;
@@ -396,8 +372,7 @@ class IndexLVal : public Lval {
 public:
     IndexLVal(SourceLoc l, up<Lval> b, up<Expr> idx);
     void print(std::ostream& out) const override;
-	void sem(SemContext& context) override;
-    void agen(Codegen& v) override;
+	void accept(AstVisitor& v) override;
     Lval* baseExpr() const { return base.get(); }
     Expr* indexExpr() const { return index.get(); }
 private:
@@ -413,9 +388,8 @@ private:
 
 public:
     IntConst(SourceLoc l, int v);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     int getValue() const { return value; }
 };
 
@@ -425,26 +399,23 @@ private:
 
 public:
     CharConst(SourceLoc l, unsigned char v);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     unsigned char getValue() const { return value; }
 };
 
 class TrueConst : public Rval {
 public:
     explicit TrueConst(SourceLoc l);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 };
 
 class FalseConst : public Rval {
 public:
     explicit FalseConst(SourceLoc l);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
 };
 
 // ===== Expressions =====
@@ -452,9 +423,8 @@ public:
 class LValueExpr : public Expr {
 public:
     LValueExpr(SourceLoc l, up<Lval> val);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     Lval* lvalue() const { return value.get(); }
 private:
     up<Lval> value;
@@ -463,9 +433,8 @@ private:
 class ParenExpr : public Expr {
 public:
     ParenExpr(SourceLoc l, up<Expr> expr);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     Expr* innerExpr() const { return inner.get(); }
 private:
     up<Expr> inner;
@@ -476,9 +445,8 @@ public:
     FuncCall(SourceLoc l, string id, vec<up<Expr>> a);
     const Symbol* symbol() const { return symbol_; }
     void setSymbol(Symbol* sym) { symbol_ = sym; }
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     const string& identifier() const { return name; }
     const vec<up<Expr>>& arguments() const { return args; }
 private:
@@ -491,9 +459,8 @@ private:
 class UnaryExpr : public Expr {
 public:
     UnaryExpr(SourceLoc l, UnOp operation, up<Expr> expr);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     UnOp opKind() const { return op; }
     Expr* operandExpr() const { return operand.get(); }
 private:
@@ -504,9 +471,8 @@ private:
 class BinaryExpr : public Expr {
 public:
     BinaryExpr(SourceLoc l, BinOp operation, up<Expr> left, up<Expr> right);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     BinOp opKind() const { return op; }
     Expr* leftExpr() const { return lhs.get(); }
     Expr* rightExpr() const { return rhs.get(); }
@@ -522,17 +488,14 @@ class Cond : public Expr {
 public:
     explicit Cond(SourceLoc l);
     ~Cond() override = default;
-    void sem(SemContext& context) override;
     virtual void print(std::ostream& out) const override = 0;
-    void agen(Codegen& v) override = 0;
 };
 
 class ExprCond : public Cond {
 public:
     ExprCond(SourceLoc l, up<Expr> e);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     Expr* expression() const { return expr.get(); }
 private:
     up<Expr> expr;
@@ -541,9 +504,8 @@ private:
 class ParenCond : public Cond {
 public:
     ParenCond(SourceLoc l, up<Cond> c);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     Cond* conditionExpr() const { return condition.get(); }
 private:
     up<Cond> condition;
@@ -552,9 +514,8 @@ private:
 class NotCond : public Cond {
 public:
     NotCond(SourceLoc l, up<Cond> c);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     Cond* conditionExpr() const { return condition.get(); }
 private:
     up<Cond> condition;
@@ -563,9 +524,8 @@ private:
 class BinaryCond : public Cond {
 public:
     BinaryCond(SourceLoc l, LogicOp operation, up<Cond> left, up<Cond> right);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     LogicOp opKind() const { return op; }
     Cond* leftCond() const { return lhs.get(); }
     Cond* rightCond() const { return rhs.get(); }
@@ -578,9 +538,8 @@ private:
 class RelCond : public Cond {
 public:
     RelCond(SourceLoc l, RelOp operation, up<Expr> left, up<Expr> right);
-    void sem(SemContext& context) override;
+    void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
-    void agen(Codegen& v) override;
     RelOp opKind() const { return op; }
     Expr* leftExpr() const { return lhs.get(); }
     Expr* rightExpr() const { return rhs.get(); }

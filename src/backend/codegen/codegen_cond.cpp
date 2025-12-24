@@ -16,7 +16,7 @@ void LLVMCodegen::gen(ExprCond& n) {
 		value = nullptr;
 		return;
 	}
-	expr->agen(*this);
+	expr->accept(*this);
 	auto* condVal = value;
 	if (!condVal) {
 		value = nullptr;
@@ -38,7 +38,7 @@ void LLVMCodegen::gen(ExprCond& n) {
 
 void LLVMCodegen::gen(ParenCond& n) {
 	if (auto* inner = n.conditionExpr()) {
-		inner->agen(*this);
+		inner->accept(*this);
 	} 
 	else {
 		value = nullptr;
@@ -51,7 +51,7 @@ void LLVMCodegen::gen(NotCond& n) {
 		value = nullptr;
 		return;
 	}
-	inner->agen(*this);
+	inner->accept(*this);
 	auto* condVal = value;
 	if (!condVal) {
 		return;
@@ -97,7 +97,7 @@ void LLVMCodegen::gen(BinaryCond& n) {
 	auto* mergeBB = llvm::BasicBlock::Create(genCtx.llvmContext(), "cond.end", function);
 
 	if (auto* left = n.leftCond()) {
-		left->agen(*this);
+		left->accept(*this);
 	}
 	llvm::Value* lhsVal   = ensureBool(value);
 	value                 = nullptr;
@@ -108,7 +108,7 @@ void LLVMCodegen::gen(BinaryCond& n) {
 		genCtx.builder().SetInsertPoint(rhsBB);
 
 		if (auto* right = n.rightCond()) {
-			right->agen(*this);
+			right->accept(*this);
 		}
 		llvm::Value* rhsVal = ensureBool(value);
 		genCtx.builder().CreateBr(mergeBB);
@@ -126,7 +126,7 @@ void LLVMCodegen::gen(BinaryCond& n) {
 		genCtx.builder().SetInsertPoint(rhsBB);
 
 		if (auto* right = n.rightCond()) {
-			right->agen(*this);
+			right->accept(*this);
 		}
 		llvm::Value* rhsVal = ensureBool(value);
 		genCtx.builder().CreateBr(mergeBB);
@@ -146,12 +146,12 @@ void LLVMCodegen::gen(BinaryCond& n) {
 void LLVMCodegen::gen(RelCond& n) {
 	llvm::Value* lhsVal = nullptr;
 	if (auto* lhs = n.leftExpr()) {
-		lhs->agen(*this);
+		lhs->accept(*this);
 		lhsVal = value;
 	}
 	llvm::Value* rhsVal = nullptr;
 	if (auto* rhs = n.rightExpr()) {
-		rhs->agen(*this);
+		rhs->accept(*this);
 		rhsVal = value;
 	}
 	if (!lhsVal || !rhsVal) {

@@ -22,7 +22,7 @@ void LLVMCodegen::gen(LoopStmt& n) {
 	genCtx.pushLoop(exitBB, bodyBB);
 
 	if (auto* body = n.loopBody()) {
-		body->agen(*this);
+		body->accept(*this);
 	}
 
 	// Ensure jump back to body from possible other blocks

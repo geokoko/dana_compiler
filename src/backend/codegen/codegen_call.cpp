@@ -93,16 +93,16 @@ llvm::Value* LLVMCodegen::makeCall(const FuncSymbol* calleeSym, const std::vecto
             const bool byRef = paramSym && paramSym->getPass() == Symbol::ParamPass::BY_REF;
             if (byRef) {
                 if (auto* lvalNode = getLValueNode(expr)) {
-                    lvalNode->agen(*this);
+                    lvalNode->accept(*this);
                     argVal = value;
                 }
                 if (!argVal) {
-                    expr->agen(*this);
+                    expr->accept(*this);
                     argVal = value;
                 }
             } 
             else {
-                expr->agen(*this);
+                expr->accept(*this);
                 argVal = value;
             }
         }

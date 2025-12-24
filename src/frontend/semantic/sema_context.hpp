@@ -41,7 +41,6 @@ public:
 		Symbol* symbol = nullptr;
 		SemaTypePtr returnType;
 		bool isProcedure = false;
-		bool sawReturn = false;
 	};
 
 	struct LoopFrame {
