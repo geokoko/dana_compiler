@@ -13,7 +13,7 @@
 
 void LLVMCodegen::gen(Block& n) {
 	for (auto& stmt : n.statementsList()) {
-		stmt->agen(*this);
+		stmt->accept(*this);
 	}
 }
 
@@ -33,11 +33,11 @@ void LLVMCodegen::gen(AssignStmt& n) {
 	llvm::Value* lhsAddress = nullptr;
 
 	if (auto* rhs = n.right()) {
-		rhs->agen(*this);
+		rhs->accept(*this);
 		rhsValue = value;
 	}
 	if (auto* lhs = n.left()) {
-		lhs->agen(*this);
+		lhs->accept(*this);
 		lhsAddress = value;
 	}
 
@@ -60,7 +60,7 @@ void LLVMCodegen::gen(ReturnStmt& n) {
 		: genCtx.builder().getVoidTy();
 
 	if (auto* expr = n.returnValue()) {
-		expr->agen(*this);
+		expr->accept(*this);
 		auto* v = value;
 		genCtx.builder().CreateRet(v ? v : llvm::UndefValue::get(retTy));
 	} else {
@@ -128,7 +128,7 @@ void LLVMCodegen::gen(IfStmt& n) {
 		// Generate condition
 		value = nullptr;
 		genCtx.builder().SetInsertPoint(condBB);
-		condNode->agen(*this);
+		condNode->accept(*this);
 		llvm::Value* condVal = ensureBool(value);
 		value = nullptr;
 
@@ -136,7 +136,7 @@ void LLVMCodegen::gen(IfStmt& n) {
 
 		// Generate 'then' block
 		genCtx.builder().SetInsertPoint(thenBB);
-		bodyNode->agen(*this);
+		bodyNode->accept(*this);
 		
 		if (!thenBB->getTerminator()) {
 			genCtx.builder().CreateBr(mergeBB);
@@ -149,7 +149,7 @@ void LLVMCodegen::gen(IfStmt& n) {
 	if (elseBlockNode) {
 		value = nullptr;
 		genCtx.builder().SetInsertPoint(elseBB);
-		elseBlockNode->agen(*this);
+		elseBlockNode->accept(*this);
 		if (!elseBB->getTerminator()) {
 			genCtx.builder().CreateBr(mergeBB);
 		}

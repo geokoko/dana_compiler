@@ -10,10 +10,11 @@
 #include <llvm/IR/Value.h>
 
 #include "../../frontend/ast/ast.hpp"
+#include "../../frontend/ast/ast_visitor.hpp"
 #include "codegen_context.hpp"
 
 // Codegen visitor interface 
-class Codegen {
+class Codegen : public AstVisitor {
 public:
 	virtual ~Codegen() = default;
 
@@ -57,6 +58,42 @@ public:
 	virtual void gen(NotCond&) = 0;
 	virtual void gen(BinaryCond&) = 0;
 	virtual void gen(RelCond&) = 0;
+
+	void visit(Type& n) override { gen(n); }
+	void visit(FParType& n) override { gen(n); }
+	void visit(Program& n) override { gen(n); }
+	void visit(FParDef& n) override { gen(n); }
+	void visit(Header& n) override { gen(n); }
+	void visit(VarDef& n) override { gen(n); }
+	void visit(FuncDecl& n) override { gen(n); }
+	void visit(FuncDef& n) override { gen(n); }
+	void visit(Block& n) override { gen(n); }
+	void visit(SkipStmt& n) override { gen(n); }
+	void visit(ExitStmt& n) override { gen(n); }
+	void visit(AssignStmt& n) override { gen(n); }
+	void visit(ReturnStmt& n) override { gen(n); }
+	void visit(ProcCall& n) override { gen(n); }
+	void visit(BreakStmt& n) override { gen(n); }
+	void visit(ContinueStmt& n) override { gen(n); }
+	void visit(IfStmt& n) override { gen(n); }
+	void visit(LoopStmt& n) override { gen(n); }
+	void visit(IdLVal& n) override { gen(n); }
+	void visit(StringLiteralLVal& n) override { gen(n); }
+	void visit(IndexLVal& n) override { gen(n); }
+	void visit(IntConst& n) override { gen(n); }
+	void visit(CharConst& n) override { gen(n); }
+	void visit(TrueConst& n) override { gen(n); }
+	void visit(FalseConst& n) override { gen(n); }
+	void visit(LValueExpr& n) override { gen(n); }
+	void visit(ParenExpr& n) override { gen(n); }
+	void visit(FuncCall& n) override { gen(n); }
+	void visit(UnaryExpr& n) override { gen(n); }
+	void visit(BinaryExpr& n) override { gen(n); }
+	void visit(ExprCond& n) override { gen(n); }
+	void visit(ParenCond& n) override { gen(n); }
+	void visit(NotCond& n) override { gen(n); }
+	void visit(BinaryCond& n) override { gen(n); }
+	void visit(RelCond& n) override { gen(n); }
 };
 
 // Concrete LLVM codegen visitor
