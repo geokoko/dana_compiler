@@ -15,9 +15,31 @@
 #include "sema_context.hpp"
 
 namespace {
+namespace helper {
 
 // Forward declaration for recursive compatibility checks
 bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
+
+// -----------------------------------------------------------------------------
+// Type Classification
+// -----------------------------------------------------------------------------
+
+/* Checks if a semantic type is of a specific kind */
+bool isIntType(const SemaTypePtr& t) {
+	return t && t->getKind() == SemaType::TypeKind::INT;
+}
+
+bool isByteType(const SemaTypePtr& t) {
+	return t && t->getKind() == SemaType::TypeKind::BYTE;
+}
+
+bool isArrayType(const SemaTypePtr& t) {
+	return t && t->getKind() == SemaType::TypeKind::ARRAY;
+}
+
+// -----------------------------------------------------------------------------
+// Type Comparison
+// -----------------------------------------------------------------------------
 
 /* Compares two semantic types for equality */
 bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
@@ -28,11 +50,6 @@ bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
 		return false;
 	}
 	return a->equals(*b);
-}
-
-/* Converts the frontend DataType enum to the corresponding semantic type */
-SemaTypePtr scalarType(DataType dt) {
-	return dt == DataType::INT ? makeIntType() : makeByteType();
 }
 
 // Checks compatibility of array types, allowing sized actuals for unsized parameters
@@ -76,45 +93,46 @@ bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected) {
 	return typesEqual(actual, expected);
 }
 
-/* Converts a semantic type to its string representation for diagnostics */
-std::string typeToString(const SemaTypePtr& type) {
-	if (!type) {
-		return "<invalid>";
+/* Checks if a function/procedure signature matches the provided header info */
+bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
+	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
+		return false;
 	}
-	switch (type->getKind()) {
-		case SemaType::TypeKind::INT:
-			return "int";
-		case SemaType::TypeKind::BYTE:
-			return "byte";
-		case SemaType::TypeKind::VOID:
-			return "void";
-		case SemaType::TypeKind::ARRAY: {
-			const auto* arr = static_cast<const ArrayType*>(type.get());
-			std::ostringstream oss;
-			oss << typeToString(arr->elementType()) << '[';
-			if (arr->size()) {
-				oss << *arr->size();
-			}
-			oss << ']';
-			return oss.str();
+	const auto* func = static_cast<const FuncSymbol*>(symbol);
+	if (func->isProcedure() != info.isProcedure) {
+		return false;
+	}
+	std::vector<SemaTypePtr> paramTypes;
+	paramTypes.reserve(info.params.size());
+	for (const auto& param : info.params) {
+		paramTypes.push_back(param.type);
+	}
+	auto expectedSig = makeFuncType(info.returnType, std::move(paramTypes));
+	if (!typesEqual(expectedSig, func->getType())) {
+		return false;
+	}
+	const auto& params = func->getParams();
+	if (params.size() != info.params.size()) {
+		return false;
+	}
+	for (std::size_t i = 0; i < params.size(); ++i) {
+		if (!typesEqual(params[i]->getType(), info.params[i].type)) {
+			return false;
 		}
-		case SemaType::TypeKind::FUNC:
-			return "fn";
+		if (params[i]->getPass() != info.params[i].passMode) {
+			return false;
+		}
 	}
-	return "<unknown>";
+	return true;
 }
 
-/* Checks if a semantic type is of a specific kind */
-bool isIntType(const SemaTypePtr& t) {
-	return t && t->getKind() == SemaType::TypeKind::INT;
-}
+// -----------------------------------------------------------------------------
+// Type Construction and Resolution
+// -----------------------------------------------------------------------------
 
-bool isByteType(const SemaTypePtr& t) {
-	return t && t->getKind() == SemaType::TypeKind::BYTE;
-}
-
-bool isArrayType(const SemaTypePtr& t) {
-	return t && t->getKind() == SemaType::TypeKind::ARRAY;
+/* Converts the frontend DataType enum to the corresponding semantic type */
+SemaTypePtr scalarType(DataType dt) {
+	return dt == DataType::INT ? makeIntType() : makeByteType();
 }
 
 /* Validates an array dimension */
@@ -179,49 +197,49 @@ SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemC
 	return resolved;
 }
 
-/* Checks if a function/procedure signature matches the provided header info */
-bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
-	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
-		return false;
+// -----------------------------------------------------------------------------
+// Diagnostics
+// -----------------------------------------------------------------------------
+
+/* Converts a semantic type to its string representation for diagnostics */
+std::string typeToString(const SemaTypePtr& type) {
+	if (!type) {
+		return "<invalid>";
 	}
-	const auto* func = static_cast<const FuncSymbol*>(symbol);
-	if (func->isProcedure() != info.isProcedure) {
-		return false;
-	}
-	std::vector<SemaTypePtr> paramTypes;
-	paramTypes.reserve(info.params.size());
-	for (const auto& param : info.params) {
-		paramTypes.push_back(param.type);
-	}
-	auto expectedSig = makeFuncType(info.returnType, std::move(paramTypes));
-	if (!typesEqual(expectedSig, func->getType())) {
-		return false;
-	}
-	const auto& params = func->getParams();
-	if (params.size() != info.params.size()) {
-		return false;
-	}
-	for (std::size_t i = 0; i < params.size(); ++i) {
-		if (!typesEqual(params[i]->getType(), info.params[i].type)) {
-			return false;
+	switch (type->getKind()) {
+		case SemaType::TypeKind::INT:
+			return "int";
+		case SemaType::TypeKind::BYTE:
+			return "byte";
+		case SemaType::TypeKind::VOID:
+			return "void";
+		case SemaType::TypeKind::ARRAY: {
+			const auto* arr = static_cast<const ArrayType*>(type.get());
+			std::ostringstream oss;
+			oss << typeToString(arr->elementType()) << '[';
+			if (arr->size()) {
+				oss << *arr->size();
+			}
+			oss << ']';
+			return oss.str();
 		}
-		if (params[i]->getPass() != info.params[i].passMode) {
-			return false;
-		}
+		case SemaType::TypeKind::FUNC:
+			return "fn";
 	}
-	return true;
+	return "<unknown>";
 }
 
+} // namespace helper
 } // namespace
 
 class SemanticPass : public AstVisitor {
 public:
 	explicit SemanticPass(SemContext& context) : context_(context) {}
 
-	void visit(Type& n) override { resolveType(n, context_); }
+	void visit(Type& n) override { helper::resolveType(n, context_); }
 	void visit(FParType& n) override {
 		Symbol::ParamPass pass = Symbol::ParamPass::BY_VAL;
-		resolveParamType(n, pass, context_);
+		helper::resolveParamType(n, pass, context_);
 	}
 
 	void visit(Program& n) override {
@@ -273,7 +291,7 @@ public:
 		info.loc = n.loc;
 		const auto returnType = n.returnType();
 		info.isProcedure = !returnType.has_value();
-		info.returnType = info.isProcedure ? makeVoidType() : scalarType(*returnType);
+		info.returnType = info.isProcedure ? makeVoidType() : helper::scalarType(*returnType);
 
 		for (const auto& param : n.parameters()) {
 			if (!param) {
@@ -287,7 +305,7 @@ public:
 			}
 
 			Symbol::ParamPass pass = Symbol::ParamPass::BY_VAL;
-			auto paramType = resolveParamType(*typeNode, pass, context_);
+			auto paramType = helper::resolveParamType(*typeNode, pass, context_);
 			if (!paramType) {
 				continue;
 			}
@@ -318,7 +336,7 @@ public:
 		if (!typeNode) {
 			return;
 		}
-		auto resolved = resolveType(*typeNode, context_);
+		auto resolved = helper::resolveType(*typeNode, context_);
 		if (!resolved) {
 			return;
 		}
@@ -347,7 +365,7 @@ public:
 		auto existing = context_.lookupLocalSymbol(info->name);
 		Symbol* symbol = existing.symbol;
 		if (symbol) {
-			if (!signaturesMatch(*info, symbol)) {
+			if (!helper::signaturesMatch(*info, symbol)) {
 				context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 				                      n.loc,
 				                      "forward declaration of '" + info->name + "' conflicts with previous declaration");
@@ -406,7 +424,7 @@ public:
 		auto existing = context_.lookupLocalSymbol(info->name);
 		Symbol* symbol = existing.symbol;
 		if (symbol) {
-			if (!signaturesMatch(*info, symbol)) {
+			if (!helper::signaturesMatch(*info, symbol)) {
 				context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 				                      n.loc, "definition of '" + info->name + "' does not match prior declaration");
 				return;
@@ -495,7 +513,7 @@ public:
 			                      n.loc, "invalid assignment target");
 			return;
 		}
-		if (isArrayType(leftType)) {
+		if (helper::isArrayType(leftType)) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "cannot assign to an array value");
 			return;
@@ -505,10 +523,10 @@ public:
 			                      n.loc, "left-hand side of assignment is not assignable");
 			return;
 		}
-		if (!typesEqual(leftType, rightType)) {
+		if (!helper::typesEqual(leftType, rightType)) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, n.loc,
-			                      "assignment type mismatch: left is '" + typeToString(leftType) +
-			                      "', right is '" + typeToString(rightType) + "'");
+			                      "assignment type mismatch: left is '" + helper::typeToString(leftType) +
+			                      "', right is '" + helper::typeToString(rightType) + "'");
 		}
 	}
 
@@ -522,10 +540,10 @@ public:
 		if (!frame || frame->isProcedure || !value) {
 			return;
 		}
-		if (!typesEqual(frame->returnType, value->type())) {
+		if (!helper::typesEqual(frame->returnType, value->type())) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, n.loc,
-			                      "return type mismatch: expected '" + typeToString(frame->returnType) +
-			                      "' but got '" + typeToString(value->type()) + "'");
+			                      "return type mismatch: expected '" + helper::typeToString(frame->returnType) +
+			                      "' but got '" + helper::typeToString(value->type()) + "'");
 		}
 	}
 
@@ -607,14 +625,14 @@ public:
 			index->accept(*this);
 		}
 		auto baseType = base ? base->type() : SemaTypePtr{};
-		if (!isArrayType(baseType)) {
+		if (!helper::isArrayType(baseType)) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "cannot index non-array value");
 			n.setType(nullptr);
 			n.setAssignable(false);
 			return;
 		}
-		if (!index || !isIntType(index->type())) {
+		if (!index || !helper::isIntType(index->type())) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "array index must be of type int");
 		}
@@ -693,14 +711,14 @@ public:
 		switch (n.opKind()) {
 			case UnOp::Plus:
 			case UnOp::Minus:
-				if (!isIntType(operandType)) {
+				if (!helper::isIntType(operandType)) {
 					context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 					                      n.loc, "unary '+' and '-' require int operand");
 				}
 				n.setType(makeIntType());
 				break;
 			case UnOp::Not:
-				if (!isByteType(operandType)) {
+				if (!helper::isByteType(operandType)) {
 					context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 					                      n.loc, "'!' requires byte operand");
 				}
@@ -728,8 +746,8 @@ public:
 			case BinOp::Mul:
 			case BinOp::Div:
 			case BinOp::Mod:
-				if (!typesEqual(leftType, rightType) ||
-					!(isIntType(leftType) || isByteType(leftType))) {
+				if (!helper::typesEqual(leftType, rightType) ||
+					!(helper::isIntType(leftType) || helper::isByteType(leftType))) {
 					context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 					                      n.loc, "arithmetic operands must both be int or byte");
 				}
@@ -737,7 +755,7 @@ public:
 				break;
 			case BinOp::AndBits:
 			case BinOp::OrBits:
-				if (!isByteType(leftType) || !typesEqual(leftType, rightType)) {
+				if (!helper::isByteType(leftType) || !helper::typesEqual(leftType, rightType)) {
 					context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 					                      n.loc, "'&' and '|' require byte operands");
 				}
@@ -752,7 +770,7 @@ public:
 		if (auto* expr = n.expression()) {
 			expr->accept(*this);
 		}
-		if (!isByteType(n.expression() ? n.expression()->type() : SemaTypePtr{})) {
+		if (!helper::isByteType(n.expression() ? n.expression()->type() : SemaTypePtr{})) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "condition expression must have type byte");
 		}
@@ -792,7 +810,7 @@ public:
 		}
 		auto lt = n.leftExpr() ? n.leftExpr()->type() : SemaTypePtr{};
 		auto rt = n.rightExpr() ? n.rightExpr()->type() : SemaTypePtr{};
-		if (!typesEqual(lt, rt) || !(isIntType(lt) || isByteType(lt))) {
+		if (!helper::typesEqual(lt, rt) || !(helper::isIntType(lt) || helper::isByteType(lt))) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "comparison requires operands of the same numeric type");
 		}
@@ -817,12 +835,12 @@ private:
 				arg->accept(*this);
 			}
 			auto actualType = arg ? arg->type() : SemaTypePtr{};
-			if (!typesCompatible(actualType, params[i]->getType())) {
+			if (!helper::typesCompatible(actualType, params[i]->getType())) {
 				context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 				                      arg ? arg->loc : loc,
 				                      "in call to '" + callee + "', argument " + std::to_string(i + 1) +
-				                      " has type '" + typeToString(actualType) + "', expected '" +
-				                      typeToString(params[i]->getType()) + "'");
+				                      " has type '" + helper::typeToString(actualType) + "', expected '" +
+				                      helper::typeToString(params[i]->getType()) + "'");
 				ok = false;
 			}
 			if (params[i]->getPass() == Symbol::ParamPass::BY_REF) {
