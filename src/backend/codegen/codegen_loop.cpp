@@ -4,7 +4,7 @@
 
 void LLVMCodegen::gen(LoopStmt& n) {
 	auto* curBB = genCtx.builder().GetInsertBlock();
-	auto* function = curBB ? genCtx.builder().GetInsertBlock()->getParent() : nullptr;
+	auto* function = curBB ? curBB->getParent() : nullptr;
 	if (!function) {
 		value = nullptr;
 		return;

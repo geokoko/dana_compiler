@@ -94,6 +94,10 @@ void LLVMCodegen::gen(IfStmt& n) {
 	};
 
 	llvm::BasicBlock* curBB = genCtx.builder().GetInsertBlock();
+	if (!curBB) {
+		value = nullptr;
+		return;
+	}
 	llvm::Function* function = curBB->getParent();
 
 	llvm::BasicBlock* mergeBB = llvm::BasicBlock::Create(genCtx.llvmContext(), "if.end", function);
