@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -151,7 +152,7 @@ int main(int argc, char** argv) {
 	}
 	std::string asmPath = change_extension(filename, ".asm");
 	{
-		std::string cmd = "llc " + optFlag + " -filetype=asm \"" + immPath + "\" -o \"" + asmPath + "\"";
+		std::string cmd = "llc-18 " + optFlag + " -filetype=asm \"" + immPath + "\" -o \"" + asmPath + "\"";
 		if (!run_command(cmd)) {
 			std::cerr << "Failed to generate assembly (.asm).\n";
 			return 1;
@@ -160,7 +161,7 @@ int main(int argc, char** argv) {
 
 	std::string objPath = change_extension(filename, ".o");
 	{
-		std::string cmd = "llc " + optFlag + " -filetype=obj \"" + immPath + "\" -o \"" + objPath + "\"";
+		std::string cmd = "llc-18 " + optFlag + " -filetype=obj \"" + immPath + "\" -o \"" + objPath + "\"";
 		if (!run_command(cmd)) {
 			std::cerr << "Failed to generate object file (.o).\n";
 			return 1;
@@ -170,7 +171,16 @@ int main(int argc, char** argv) {
 	std::string execPath = "a.out";
 	{
 		// Use clang to link, and link against our Dana runtime object.
-		std::string linkCmd = "clang \"" + objPath + "\" runtime/lib.o -o \"" + execPath + "\"";
+		// Find runtime/lib.o relative to the danac executable
+		std::string runtimeLibPath = "src/runtime/lib.o";
+		// Try alternative path if running from src directory
+		std::ifstream testFile("runtime/lib.o");
+		if (testFile.good()) {
+			runtimeLibPath = "runtime/lib.o";
+		}
+		testFile.close();
+		
+		std::string linkCmd = "clang \"" + objPath + "\" " + runtimeLibPath + " -o \"" + execPath + "\"";
 		if (!run_command(linkCmd)) {
 			std::cerr << "Failed to link executable.\n";
 			return 1;
