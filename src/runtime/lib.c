@@ -18,6 +18,8 @@ void dana_writeString(const char* s) {
     printf("%s", s);
 }
 
+// Read functions return default values on error (0 for numeric, '\0' for char)
+// This matches the Dana language specification
 int dana_readInteger(void) {
     int n = 0;
     if (scanf("%d", &n) != 1) {

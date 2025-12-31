@@ -423,6 +423,7 @@ public:
 
 		auto existing = context_.lookupLocalSymbol(info->name);
 		Symbol* symbol = existing.symbol;
+		bool wasForwardDeclared = false;
 		if (symbol) {
 			if (!helper::signaturesMatch(*info, symbol)) {
 				context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
@@ -435,6 +436,7 @@ public:
 				return;
 			}
 			// Reuse existing symbol, don't create a new one
+			wasForwardDeclared = true;
 		} else {
 			// Create new function symbol if not already declared
 			std::vector<SemaTypePtr> paramTypes;
@@ -463,8 +465,8 @@ public:
 		context_.enterFunction(frame);
 
 		// After entering function, declare parameters in the new scope
-		// Only if the symbol was newly created (not forward-declared)
-		if (!existing.symbol) {
+		// Only if the symbol was not forward-declared (parameters were already added)
+		if (!wasForwardDeclared) {
 			for (const auto& paramInfo : info->params) {
 				auto sym = std::make_unique<ParamSymbol>(paramInfo.name, paramInfo.type, paramInfo.passMode, paramInfo.loc);
 				sym->setDefiningFunc(fsym);
