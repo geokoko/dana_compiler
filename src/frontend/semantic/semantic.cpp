@@ -434,23 +434,24 @@ public:
 				                      n.loc, "redefinition of '" + info->name + "'");
 				return;
 			}
+			// Reuse existing symbol, don't create a new one
+		} else {
+			// Create new function symbol if not already declared
+			std::vector<SemaTypePtr> paramTypes;
+			paramTypes.reserve(info->params.size());
+			for (const auto& param : info->params) {
+				paramTypes.push_back(param.type);
+			}
+			auto sig = makeFuncType(info->returnType, std::move(paramTypes));
+			auto func = std::make_unique<FuncSymbol>(info->name, std::move(sig), info->isProcedure, info->loc);
+			symbol = func.get();
+			symbol->setDefiningFunc(context_.currentFunction()
+				? static_cast<FuncSymbol*>(context_.currentFunction()->symbol)
+				: nullptr);
+			context_.declareSymbol(std::move(func));
 		}
-
-		// Create new function symbol if not already declared
-		std::vector<SemaTypePtr> paramTypes;
-		paramTypes.reserve(info->params.size());
-		for (const auto& param : info->params) {
-			paramTypes.push_back(param.type);
-		}
-		auto sig = makeFuncType(info->returnType, std::move(paramTypes));
-		auto func = std::make_unique<FuncSymbol>(info->name, std::move(sig), info->isProcedure, info->loc);
-		symbol = func.get();
-		context_.declareSymbol(std::move(func));
 
 		auto* fsym = static_cast<FuncSymbol*>(symbol);
-		symbol->setDefiningFunc(context_.currentFunction()
-			? static_cast<FuncSymbol*>(context_.currentFunction()->symbol)
-			: nullptr);
 		header->setSymbol(fsym);
 
 		context_.openScope();
@@ -462,12 +463,15 @@ public:
 		context_.enterFunction(frame);
 
 		// After entering function, declare parameters in the new scope
-		for (const auto& paramInfo : info->params) {
-			auto sym = std::make_unique<ParamSymbol>(paramInfo.name, paramInfo.type, paramInfo.passMode, paramInfo.loc);
-			sym->setDefiningFunc(fsym);
-			auto result = context_.declareSymbol(std::move(sym));
-			if (result.symbol) {
-				fsym->addParam(static_cast<ParamSymbol*>(result.symbol));
+		// Only if the symbol was newly created (not forward-declared)
+		if (!existing.symbol) {
+			for (const auto& paramInfo : info->params) {
+				auto sym = std::make_unique<ParamSymbol>(paramInfo.name, paramInfo.type, paramInfo.passMode, paramInfo.loc);
+				sym->setDefiningFunc(fsym);
+				auto result = context_.declareSymbol(std::move(sym));
+				if (result.symbol) {
+					fsym->addParam(static_cast<ParamSymbol*>(result.symbol));
+				}
 			}
 		}
 

@@ -99,10 +99,10 @@ $(LEXER_CPP) $(LEXER_H): $(LEXER_DIR)/lexer.l
 # Clean intermediate files
 clean:
 	rm -f $(TEST_DIR)/*.imm \
-	rm -f $(TEST_DIR)/*.asm \
-	rm -f $(TEST_DIR)/*.o \
-	rm -f *.out \
-	rm -f runtime/lib.o \
+		$(TEST_DIR)/*.asm \
+		$(TEST_DIR)/*.o \
+		*.out \
+		runtime/lib.o \
 		$(OBJS) $(TARGET) \
 		$(PARSER_CPP) $(PARSER_HH) \
 		$(LEXER_CPP) $(LEXER_H) \
@@ -110,6 +110,5 @@ clean:
 
 # Clean everything including the executable
 distclean: clean
-	rm -f $(TARGET)
 
 .PHONY: all clean distclean 

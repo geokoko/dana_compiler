@@ -1,3 +1,19 @@
 src/compile_commands.json
 
 src/.cache/*
+
+# Build artifacts
+*.o
+*.out
+src/danac
+src/frontend/lexer/lexer.cpp
+src/frontend/lexer/lexer.hpp
+src/frontend/parser/parser.tab.cc
+src/frontend/parser/parser.tab.hh
+src/frontend/parser/location.hh
+
+# Test outputs
+tests/**/*.imm
+tests/**/*.asm
+tests/**/*.o
+
