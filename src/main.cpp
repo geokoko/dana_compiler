@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -12,8 +13,13 @@
 #include "./backend/codegen/codegen.hpp"
 #include "./backend/optimizer/optimizer.h"
 #include "./runtime/danalib.hpp"
+#include "./runtime/lib_bitcode.hpp"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Error.h"
 #include "llvm/IR/Verifier.h"
 
 extern FILE* yyin;
@@ -37,11 +43,44 @@ static bool run_command(const std::string& cmd) {
 }
 
 static void print_usage(const char* prog) {
-	std::cerr << "Usage: " << prog << " [--ast-tree] [-O0|-O1|-O2|-O3] <file.dana>\n";
+	std::cerr << "Usage: " << prog << " [--ast-tree] [--emit-ir] [-O0|-O1|-O2|-O3] <file.dana>\n";
+}
+
+static bool link_runtime_bitcode(CodegenContext& codegenCtx) {
+	auto& mainModule = codegenCtx.llvmModule();
+	llvm::StringRef data(reinterpret_cast<const char*>(dana_runtime_bitcode), dana_runtime_bitcode_len);
+	auto buffer = llvm::MemoryBuffer::getMemBufferCopy(data, "dana_runtime.bc");
+	auto runtimeModuleOrErr = llvm::parseBitcodeFile(buffer->getMemBufferRef(), codegenCtx.llvmContext());
+	if (!runtimeModuleOrErr) {
+		std::cerr << "Error: failed to parse embedded runtime bitcode: "
+		          << llvm::toString(runtimeModuleOrErr.takeError()) << "\n";
+		return false;
+	}
+
+	auto runtimeModule = std::move(*runtimeModuleOrErr);
+
+	if (mainModule.getTargetTriple().empty() && !runtimeModule->getTargetTriple().empty()) {
+		mainModule.setTargetTriple(runtimeModule->getTargetTriple());
+	} else if (runtimeModule->getTargetTriple().empty() && !mainModule.getTargetTriple().empty()) {
+		runtimeModule->setTargetTriple(mainModule.getTargetTriple());
+	}
+
+	if (mainModule.getDataLayoutStr().empty() && !runtimeModule->getDataLayoutStr().empty()) {
+		mainModule.setDataLayout(runtimeModule->getDataLayout());
+	}
+	runtimeModule->setDataLayout(mainModule.getDataLayout());
+
+	if (llvm::Linker::linkModules(mainModule, std::move(runtimeModule))) {
+		std::cerr << "Error: failed to link embedded runtime bitcode.\n";
+		return false;
+	}
+
+	return true;
 }
 
 int main(int argc, char** argv) {
 	bool want_tree = false;
+	bool emit_ir = false;
 	const char* fname = nullptr;
 	llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
 	std::string optFlag = "-O0";
@@ -50,6 +89,8 @@ int main(int argc, char** argv) {
 		std::string arg = argv[i];
 		if (arg == "--ast-tree") {
 			want_tree = true;
+		} else if (arg == "--emit-ir") {
+			emit_ir = true;
 		} else if (arg == "-O0") {
 			optLevel = llvm::OptimizationLevel::O0;
 			optFlag = "-O0";
@@ -127,11 +168,17 @@ int main(int argc, char** argv) {
 	Codegen generate(codegenCtx);
 	ast_root->accept(generate);
 
+	if (!link_runtime_bitcode(codegenCtx)) {
+		return 1;
+	}
+
 	Optimizer optimizer;
 	optimizer.optimize(codegenCtx.llvmModule(), optLevel);
 
-	codegenCtx.llvmModule().print(llvm::outs(), nullptr);
-	llvm::outs().flush();
+	if (emit_ir) {
+		codegenCtx.llvmModule().print(llvm::outs(), nullptr);
+		llvm::outs().flush();
+	}
 
 	if (llvm::verifyModule(codegenCtx.llvmModule(), &llvm::errs())) {
 		std::cerr << "Error: generated LLVM IR is invalid.\n";
@@ -169,8 +216,8 @@ int main(int argc, char** argv) {
 
 	std::string execPath = "a.out";
 	{
-		// Use clang to link, and link against our Dana runtime object.
-		std::string linkCmd = "clang \"" + objPath + "\" runtime/lib.o -o \"" + execPath + "\"";
+		// Use clang to link the generated object with system libraries.
+		std::string linkCmd = "clang \"" + objPath + "\" -o \"" + execPath + "\"";
 		if (!run_command(linkCmd)) {
 			std::cerr << "Failed to link executable.\n";
 			return 1;
