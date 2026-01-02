@@ -86,6 +86,8 @@ void FuncDecl::accept(AstVisitor& v) { v.visit(*this); }
 FuncDef::FuncDef(SourceLoc l, up<Header> h, vec<up<Def>> defs, up<Block> b)
     : Def(l), header(std::move(h)), locals(std::move(defs)), body(std::move(b)) {}
 void FuncDef::accept(AstVisitor& v) { v.visit(*this); }
+bool FuncDef::isEntrypoint() { return isEntrypoint_; }
+void FuncDef::setEntrypoint(bool cond) { isEntrypoint_ = cond; }
 
 // ===== Statements =====
 
@@ -103,8 +105,10 @@ ReturnStmt::ReturnStmt(SourceLoc l, up<Expr> expr)
     : Stmt(l), value(std::move(expr)) {}
 void ReturnStmt::accept(AstVisitor& v) { v.visit(*this); }
 
-ProcCall::ProcCall(SourceLoc l, string id, vec<up<Expr>> a)
-    : Stmt(l), name(std::move(id)), args(std::move(a)) {}
+// ProcCall
+ProcCall::ProcCall(SourceLoc l, string id, vec<up<Expr>> a) :
+    Stmt(l), name(std::move(id)), args(std::move(a)) {}
+
 void ProcCall::accept(AstVisitor& v) { v.visit(*this); }
 
 BreakStmt::BreakStmt(SourceLoc l, optional<string> lbl)

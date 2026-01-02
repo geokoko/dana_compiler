@@ -14,223 +14,221 @@
 #include "../symbol/symbol.hpp"
 #include "sema_context.hpp"
 
-namespace {
 namespace helper {
 
-// Forward declaration for recursive compatibility checks
-bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
+	// Forward declaration for recursive compatibility checks
+	bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected);
 
-// -----------------------------------------------------------------------------
-// Type Classification
-// -----------------------------------------------------------------------------
+	// -----------------------------------------------------------------------------
+	// Type Classification
+	// -----------------------------------------------------------------------------
 
-/* Checks if a semantic type is of a specific kind */
-bool isIntType(const SemaTypePtr& t) {
-	return t && t->getKind() == SemaType::TypeKind::INT;
-}
-
-bool isByteType(const SemaTypePtr& t) {
-	return t && t->getKind() == SemaType::TypeKind::BYTE;
-}
-
-bool isArrayType(const SemaTypePtr& t) {
-	return t && t->getKind() == SemaType::TypeKind::ARRAY;
-}
-
-// -----------------------------------------------------------------------------
-// Type Comparison
-// -----------------------------------------------------------------------------
-
-/* Compares two semantic types for equality */
-bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
-	if (a == b) {
-		return true;
-	}
-	if (!a || !b) {
-		return false;
-	}
-	return a->equals(*b);
-}
-
-// Checks compatibility of array types, allowing sized actuals for unsized parameters
-bool arrayTypesCompatible(const ArrayType* actualArr, const ArrayType* expectedArr) {
-	if (!actualArr || !expectedArr) {
-		return false;
+	/* Checks if a semantic type is of a specific kind */
+	bool isIntType(const SemaTypePtr& t) {
+		return t && t->getKind() == SemaType::TypeKind::INT;
 	}
 
-	const auto expectedSize = expectedArr->size();
-	const auto actualSize = actualArr->size();
-
-	// If the parameter is sized, require an exact match from the caller
-	if (expectedSize) {
-		if (!actualSize || *actualSize != *expectedSize) {
-			return false;
-		}
-	}
-	// If the parameter is unsized, any actual size is acceptable
-	return typesCompatible(actualArr->elementType(), expectedArr->elementType());
-}
-
-// Checks whether an "actual" type can be used where "expected" is required
-bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected) {
-	if (actual == expected) {
-		return true;
-	}
-	if (!actual || !expected) {
-		return false;
+	bool isByteType(const SemaTypePtr& t) {
+		return t && t->getKind() == SemaType::TypeKind::BYTE;
 	}
 
-	if (expected->getKind() == SemaType::TypeKind::ARRAY) {
-		if (actual->getKind() != SemaType::TypeKind::ARRAY) {
-			return false;
-		}
-		return arrayTypesCompatible(
-			static_cast<const ArrayType*>(actual.get()),
-			static_cast<const ArrayType*>(expected.get()));
+	bool isArrayType(const SemaTypePtr& t) {
+		return t && t->getKind() == SemaType::TypeKind::ARRAY;
 	}
 
-	// For non-array types, fall back to structural equality
-	return typesEqual(actual, expected);
-}
+	// -----------------------------------------------------------------------------
+	// Type Comparison
+	// -----------------------------------------------------------------------------
 
-/* Checks if a function/procedure signature matches the provided header info */
-bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
-	if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
-		return false;
-	}
-	const auto* func = static_cast<const FuncSymbol*>(symbol);
-	if (func->isProcedure() != info.isProcedure) {
-		return false;
-	}
-	std::vector<SemaTypePtr> paramTypes;
-	paramTypes.reserve(info.params.size());
-	for (const auto& param : info.params) {
-		paramTypes.push_back(param.type);
-	}
-	auto expectedSig = makeFuncType(info.returnType, std::move(paramTypes));
-	if (!typesEqual(expectedSig, func->getType())) {
-		return false;
-	}
-	const auto& params = func->getParams();
-	if (params.size() != info.params.size()) {
-		return false;
-	}
-	for (std::size_t i = 0; i < params.size(); ++i) {
-		if (!typesEqual(params[i]->getType(), info.params[i].type)) {
-			return false;
-		}
-		if (params[i]->getPass() != info.params[i].passMode) {
-			return false;
-		}
-	}
-	return true;
-}
-
-// -----------------------------------------------------------------------------
-// Type Construction and Resolution
-// -----------------------------------------------------------------------------
-
-/* Converts the frontend DataType enum to the corresponding semantic type */
-SemaTypePtr scalarType(DataType dt) {
-	return dt == DataType::INT ? makeIntType() : makeByteType();
-}
-
-/* Validates an array dimension */
-bool validateDimension(const std::optional<int>& dim, bool allowUnsized, const SourceLoc& loc, SemContext& context) {
-	if (!dim.has_value()) {
-		if (allowUnsized) {
+	/* Compares two semantic types for equality */
+	bool typesEqual(const SemaTypePtr& a, const SemaTypePtr& b) {
+		if (a == b) {
 			return true;
 		}
-		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc,
-		                      "array dimension must be specified");
-		return false;
+		if (!a || !b) {
+			return false;
+		}
+		return a->equals(*b);
 	}
-	if (*dim <= 0) {
-		context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc,
-		                      "array dimension must be greater than zero");
-		return false;
-	}
-	return true;
-}
 
-/* Builds any semantic type from a AST captured info into an array type (or a base type, if no dims are present) */
-/* If allowUnsizedFirst is true, the first dimension can be unsized (for parameters) */
-SemaTypePtr buildArrayType(const SourceLoc& loc, SemaTypePtr base, const vec<std::optional<int>>& dims,
-                           bool allowUnsizedFirst, SemContext& context) {
-	SemaTypePtr result = std::move(base); // first move the scalar type to result
-	for (std::size_t i = dims.size(); i-- > 0;) {
-		const bool allowUnsized = allowUnsizedFirst && i == 0;
-		if (!validateDimension(dims[i], allowUnsized, loc, context)) {
+	// Checks compatibility of array types, allowing sized actuals for unsized parameters
+	bool arrayTypesCompatible(const ArrayType* actualArr, const ArrayType* expectedArr) {
+		if (!actualArr || !expectedArr) {
+			return false;
+		}
+
+		const auto expectedSize = expectedArr->size();
+		const auto actualSize = actualArr->size();
+
+		// If the parameter is sized, require an exact match from the caller
+		if (expectedSize) {
+			if (!actualSize || *actualSize != *expectedSize) {
+				return false;
+			}
+		}
+		// If the parameter is unsized, any actual size is acceptable
+		return typesCompatible(actualArr->elementType(), expectedArr->elementType());
+	}
+
+	// Checks whether an "actual" type can be used where "expected" is required
+	bool typesCompatible(const SemaTypePtr& actual, const SemaTypePtr& expected) {
+		if (actual == expected) {
+			return true;
+		}
+		if (!actual || !expected) {
+			return false;
+		}
+
+		if (expected->getKind() == SemaType::TypeKind::ARRAY) {
+			if (actual->getKind() != SemaType::TypeKind::ARRAY) {
+				return false;
+			}
+			return arrayTypesCompatible(
+				static_cast<const ArrayType*>(actual.get()),
+				static_cast<const ArrayType*>(expected.get()));
+		}
+
+		// For non-array types, fall back to structural equality
+		return typesEqual(actual, expected);
+	}
+
+	/* Checks if a function/procedure signature matches the provided header info */
+	bool signaturesMatch(const SemContext::HeaderInfo& info, const Symbol* symbol) {
+		if (!symbol || symbol->getKind() != Symbol::SymKind::FUNC) {
+			return false;
+		}
+		const auto* func = static_cast<const FuncSymbol*>(symbol);
+		if (func->isProcedure() != info.isProcedure) {
+			return false;
+		}
+		std::vector<SemaTypePtr> paramTypes;
+		paramTypes.reserve(info.params.size());
+		for (const auto& param : info.params) {
+			paramTypes.push_back(param.type);
+		}
+		auto expectedSig = makeFuncType(info.returnType, std::move(paramTypes));
+		if (!typesEqual(expectedSig, func->getType())) {
+			return false;
+		}
+		const auto& params = func->getParams();
+		if (params.size() != info.params.size()) {
+			return false;
+		}
+		for (std::size_t i = 0; i < params.size(); ++i) {
+			if (!typesEqual(params[i]->getType(), info.params[i].type)) {
+				return false;
+			}
+			if (params[i]->getPass() != info.params[i].passMode) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// -----------------------------------------------------------------------------
+	// Type Construction and Resolution
+	// -----------------------------------------------------------------------------
+
+	/* Converts the frontend DataType enum to the corresponding semantic type */
+	SemaTypePtr scalarType(DataType dt) {
+		return dt == DataType::INT ? makeIntType() : makeByteType();
+	}
+
+	/* Validates an array dimension */
+	bool validateDimension(const std::optional<int>& dim, bool allowUnsized, const SourceLoc& loc, SemContext& context) {
+		if (!dim.has_value()) {
+			if (allowUnsized) {
+				return true;
+			}
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc,
+								  "array dimension must be specified");
+			return false;
+		}
+		if (*dim <= 0) {
+			context.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic, loc,
+								  "array dimension must be greater than zero");
+			return false;
+		}
+		return true;
+	}
+
+	/* Builds any semantic type from a AST captured info into an array type (or a base type, if no dims are present) */
+	/* If allowUnsizedFirst is true, the first dimension can be unsized (for parameters) */
+	SemaTypePtr buildArrayType(const SourceLoc& loc, SemaTypePtr base, const vec<std::optional<int>>& dims,
+							   bool allowUnsizedFirst, SemContext& context) {
+		SemaTypePtr result = std::move(base); // first move the scalar type to result
+		for (std::size_t i = dims.size(); i-- > 0;) {
+			const bool allowUnsized = allowUnsizedFirst && i == 0;
+			if (!validateDimension(dims[i], allowUnsized, loc, context)) {
+				return nullptr;
+			}
+			std::optional<std::size_t> extent;
+			if (dims[i]) {
+				extent = static_cast<std::size_t>(*dims[i]);
+			}
+			result = makeArrayType(result, extent); // if we have dims, wrap the current result into an array type
+		}
+		/* Returns:
+			 * - base type if no dimensions
+			 * - array type(s) if dimensions are present
+			 */
+		return result;
+	}
+
+	/* Resolves a type node into a semantic base type (int or byte) */
+	SemaTypePtr resolveType(const Type& node, SemContext& context, bool allowUnsizedFirst = false) {
+		auto base = scalarType(node.data_type());
+		return buildArrayType(node.loc, base, node.dimensions(), allowUnsizedFirst, context);
+	}
+
+	/* Resolves a function/procedure parameter type, determining its pass mode */
+	SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemContext& context) {
+		const bool isArray = !node.dimensions().empty();
+		auto resolved = resolveType(node, context, true);
+		if (!resolved) {
 			return nullptr;
 		}
-		std::optional<std::size_t> extent;
-		if (dims[i]) {
-			extent = static_cast<std::size_t>(*dims[i]);
+		if (isArray) {
+			pass = Symbol::ParamPass::BY_REF;
+		} else {
+			pass = node.isByRef() ? Symbol::ParamPass::BY_REF : Symbol::ParamPass::BY_VAL;
 		}
-		result = makeArrayType(result, extent); // if we have dims, wrap the current result into an array type
+		return resolved;
 	}
-	/* Returns:
-		 * - base type if no dimensions
-		 * - array type(s) if dimensions are present
-		 */
-	return result;
-}
 
-/* Resolves a type node into a semantic base type (int or byte) */
-SemaTypePtr resolveType(const Type& node, SemContext& context, bool allowUnsizedFirst = false) {
-	auto base = scalarType(node.data_type());
-	return buildArrayType(node.loc, base, node.dimensions(), allowUnsizedFirst, context);
-}
+	// -----------------------------------------------------------------------------
+	// Diagnostics
+	// -----------------------------------------------------------------------------
 
-/* Resolves a function/procedure parameter type, determining its pass mode */
-SemaTypePtr resolveParamType(const FParType& node, Symbol::ParamPass& pass, SemContext& context) {
-	const bool isArray = !node.dimensions().empty();
-	auto resolved = resolveType(node, context, true);
-	if (!resolved) {
-		return nullptr;
-	}
-	if (isArray) {
-		pass = Symbol::ParamPass::BY_REF;
-	} else {
-		pass = node.isByRef() ? Symbol::ParamPass::BY_REF : Symbol::ParamPass::BY_VAL;
-	}
-	return resolved;
-}
-
-// -----------------------------------------------------------------------------
-// Diagnostics
-// -----------------------------------------------------------------------------
-
-/* Converts a semantic type to its string representation for diagnostics */
-std::string typeToString(const SemaTypePtr& type) {
-	if (!type) {
-		return "<invalid>";
-	}
-	switch (type->getKind()) {
-		case SemaType::TypeKind::INT:
-			return "int";
-		case SemaType::TypeKind::BYTE:
-			return "byte";
-		case SemaType::TypeKind::VOID:
-			return "void";
-		case SemaType::TypeKind::ARRAY: {
-			const auto* arr = static_cast<const ArrayType*>(type.get());
-			std::ostringstream oss;
-			oss << typeToString(arr->elementType()) << '[';
-			if (arr->size()) {
-				oss << *arr->size();
+	/* Converts a semantic type to its string representation for diagnostics */
+	std::string typeToString(const SemaTypePtr& type) {
+		if (!type) {
+			return "<invalid>";
+		}
+		switch (type->getKind()) {
+			case SemaType::TypeKind::INT:
+				return "int";
+			case SemaType::TypeKind::BYTE:
+				return "byte";
+			case SemaType::TypeKind::VOID:
+				return "void";
+			case SemaType::TypeKind::ARRAY: {
+				const auto* arr = static_cast<const ArrayType*>(type.get());
+				std::ostringstream oss;
+				oss << typeToString(arr->elementType()) << '[';
+				if (arr->size()) {
+					oss << *arr->size();
+				}
+				oss << ']';
+				return oss.str();
 			}
-			oss << ']';
-			return oss.str();
+			case SemaType::TypeKind::FUNC:
+				return "fn";
 		}
-		case SemaType::TypeKind::FUNC:
-			return "fn";
+		return "<unknown>";
 	}
-	return "<unknown>";
-}
 
 } // namespace helper
-} // namespace
 
 class SemanticPass : public AstVisitor {
 public:
@@ -250,6 +248,7 @@ public:
 			return;
 		}
 
+		top->setEntrypoint(true);
 		top->accept(*this);
 
 		auto* header = top->funcHeader();
@@ -556,10 +555,10 @@ public:
 		if (!funcSym || !funcSym->isProcedure()) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "unknown procedure '" + n.identifier() + "'");
-			n.setSymbol(nullptr);
+			n.setFuncSymbol(nullptr);
 			return;
 		}
-		n.setSymbol(funcSym);
+		n.setFuncSymbol(funcSym);
 		const auto& params = funcSym->getParams();
 		checkArguments(n.arguments(), params, n.identifier(), n.loc);
 	}
@@ -689,11 +688,11 @@ public:
 		if (!funcSym || funcSym->isProcedure()) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "unknown function '" + n.identifier() + "'");
-			n.setSymbol(nullptr);
+			n.setFuncSymbol(nullptr);
 			n.setType(nullptr);
 			return;
 		}
-		n.setSymbol(funcSym);
+		n.setFuncSymbol(funcSym);
 		const auto& params = funcSym->getParams();
 		checkArguments(n.arguments(), params, n.identifier(), n.loc);
 		const auto* sig = static_cast<const FuncType*>(funcSym->getType().get());
@@ -890,6 +889,7 @@ public:
 		FunctionInfo info;
 		info.name = header->identifier();
 		info.isProcedure = !header->returnType().has_value();
+		info.isEntrypoint = n.isEntrypoint();
 		functionStack_.push_back(info);
 
 		for (auto& def : n.localDefs()) {
@@ -937,6 +937,11 @@ public:
 		if (functionStack_.empty()) {
 			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 			                      n.loc, "'return' outside of function");
+			return;
+		}
+		if (functionStack_.back().isEntrypoint) {
+			context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
+			                      n.loc, "return statement not allowed in main function");
 			return;
 		}
 		if (functionStack_.back().isProcedure) {
@@ -1043,6 +1048,7 @@ private:
 	struct FunctionInfo {
 		std::string name;
 		bool isProcedure = false;
+		bool isEntrypoint = false;
 	};
 
 	bool blockCanFallThrough(const Block* block) {
