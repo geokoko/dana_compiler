@@ -8,10 +8,10 @@ CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -g
 LLVM_CONFIG = llvm-config-18
 # Compile C++ using LLVM
 # Use -isystem instead of -I to suppress warnings from LLVM headers
-LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-I/-isystem /g')
+LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags --link-static | sed 's/-I/-isystem /g')
 # Link LLVM libs and POSIX libs
-LLVM_LDFLAGS  = $(shell $(LLVM_CONFIG) --ldflags --libs core native) \
-				$(shell $(LLVM_CONFIG) --system-libs)
+LLVM_LDFLAGS  = $(shell $(LLVM_CONFIG) --ldflags --link-static --libs core native passes) \
+				$(shell $(LLVM_CONFIG) --link-static --system-libs)
 
 # Add rpath so danac finds libLLVM at runtime
 # This flag enables the user to run danac executable without LD_LIBRARY_PATH
