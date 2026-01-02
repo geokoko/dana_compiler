@@ -1,0 +1,7 @@
+def main
+    decl show: n as int
+    def show: n as int
+        writeInteger: n
+        writeString: "\n"
+
+    show: 42
