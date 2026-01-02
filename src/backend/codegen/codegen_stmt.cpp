@@ -65,10 +65,9 @@ void Codegen::visit(ReturnStmt& n) {
 	}
 
 	auto* fnSym = genCtx.currentFunc();
-	auto* sig   = static_cast<const FuncType*>(fnSym->getType().get());
-	auto* retTy = sig && sig->returnType()
-		? genCtx.getLLVMType(*sig->returnType())
-		: genCtx.builder().getVoidTy();
+	// Use the actual LLVM return type, which reflects overrides like main -> i32
+	auto* llvmFunc = genCtx.lookupFunction(fnSym);
+	auto* retTy = llvmFunc ? llvmFunc->getReturnType() : genCtx.builder().getVoidTy();
 
 	if (auto* expr = n.returnValue()) {
 		expr->accept(*this);
@@ -78,7 +77,13 @@ void Codegen::visit(ReturnStmt& n) {
 		if (retTy->isVoidTy()) {
 			genCtx.builder().CreateRetVoid();
 		} else {
-			genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
+			// Special case: if we are in main (or any forced i32 function) and returning void,
+			// we should return 0.
+			if (retTy->isIntegerTy()) {
+				genCtx.builder().CreateRet(llvm::ConstantInt::get(retTy, 0));
+			} else {
+				genCtx.builder().CreateRet(llvm::UndefValue::get(retTy));
+			}
 		}
 	}
 	value = nullptr;

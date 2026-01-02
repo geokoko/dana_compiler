@@ -3,6 +3,7 @@
 #include <vector>
 
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
@@ -273,7 +274,11 @@ void Codegen::visit(FuncDef& n) {
 		if (sig.retTy->isVoidTy()) {
 			genCtx.builder().CreateRetVoid();
 		} else {
-			genCtx.builder().CreateRet(llvm::UndefValue::get(sig.retTy));
+			if (is_main) {
+				genCtx.builder().CreateRet(llvm::ConstantInt::get(sig.retTy, 0));
+			} else {
+				genCtx.builder().CreateRet(llvm::UndefValue::get(sig.retTy));
+			}
 		}
 	}
 
