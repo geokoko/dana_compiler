@@ -1,5 +1,6 @@
 #include "codegen.hpp"
 
+#include <algorithm>
 #include <vector>
 
 #include <llvm/IR/BasicBlock.h>
@@ -10,7 +11,7 @@
 
 /* ========== Simple conditions ========== */
 
-void LLVMCodegen::gen(ExprCond& n) {
+void Codegen::visit(ExprCond& n) {
 	auto* expr = n.expression();
 	if (!expr) {
 		value = nullptr;
@@ -36,7 +37,7 @@ void LLVMCodegen::gen(ExprCond& n) {
 	value = nullptr;
 }
 
-void LLVMCodegen::gen(ParenCond& n) {
+void Codegen::visit(ParenCond& n) {
 	if (auto* inner = n.conditionExpr()) {
 		inner->accept(*this);
 	} 
@@ -45,7 +46,7 @@ void LLVMCodegen::gen(ParenCond& n) {
 	}
 }
 
-void LLVMCodegen::gen(NotCond& n) {
+void Codegen::visit(NotCond& n) {
 	auto* inner = n.conditionExpr();
 	if (!inner) {
 		value = nullptr;
@@ -72,7 +73,7 @@ void LLVMCodegen::gen(NotCond& n) {
 
 /* ========== Logical AND / OR ========== */
 
-void LLVMCodegen::gen(BinaryCond& n) {
+void Codegen::visit(BinaryCond& n) {
 	auto* function = genCtx.builder().GetInsertBlock() ? genCtx.builder().GetInsertBlock()->getParent() : nullptr;
 	if (!function) {
 		value = nullptr;
@@ -143,7 +144,7 @@ void LLVMCodegen::gen(BinaryCond& n) {
 
 /* ========== Relational conditions ========== */
 
-void LLVMCodegen::gen(RelCond& n) {
+void Codegen::visit(RelCond& n) {
 	llvm::Value* lhsVal = nullptr;
 	if (auto* lhs = n.leftExpr()) {
 		lhs->accept(*this);
@@ -168,10 +169,12 @@ void LLVMCodegen::gen(RelCond& n) {
 			unsigned targetBits = std::max(lhsBits, rhsBits);
 
 			if (lhsBits != targetBits) {
-				lhsVal = genCtx.builder().CreateIntCast(lhsVal, llvm::IntegerType::get(genCtx.llvmContext(), targetBits), true, "lhs.cast");
+				lhsVal = genCtx.builder().CreateIntCast(lhsVal, llvm::IntegerType::get(
+					genCtx.llvmContext(), targetBits), true, "lhs.cast");
 			}
 			if (rhsBits != targetBits) {
-				rhsVal = genCtx.builder().CreateIntCast(rhsVal, llvm::IntegerType::get(genCtx.llvmContext(), targetBits), true, "rhs.cast");
+				rhsVal = genCtx.builder().CreateIntCast(rhsVal, llvm::IntegerType::get(
+					genCtx.llvmContext(), targetBits), true, "rhs.cast");
 			}
 		} 
 		else {
@@ -203,4 +206,3 @@ void LLVMCodegen::gen(RelCond& n) {
 	}
 	value = cmp;
 }
-

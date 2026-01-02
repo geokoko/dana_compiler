@@ -11,24 +11,35 @@
 
 /* ========== Basic statements ========== */
 
-void LLVMCodegen::gen(Block& n) {
+void Codegen::visit(Block& n) {
 	for (auto& stmt : n.statementsList()) {
 		stmt->accept(*this);
 	}
 }
 
-void LLVMCodegen::gen(SkipStmt& n) {
+void Codegen::visit(SkipStmt& n) {
 	(void)n;
 	value = nullptr;
 }
 
-void LLVMCodegen::gen(ExitStmt& n) {
+void Codegen::visit(ExitStmt& n) {
 	(void)n;
-	genCtx.builder().CreateRetVoid();
+	auto* curBB = genCtx.builder().GetInsertBlock();
+	auto* parentFn = curBB ? curBB->getParent() : nullptr;
+	if (!parentFn) {
+		value = nullptr;
+		return;
+	}
+	auto* retTy = parentFn->getReturnType();
+	if (retTy->isVoidTy()) {
+		genCtx.builder().CreateRetVoid();
+	} else {
+		genCtx.builder().CreateRet(llvm::ConstantInt::get(retTy, 0, true));
+	}
 	value = nullptr;
 }
 
-void LLVMCodegen::gen(AssignStmt& n) {
+void Codegen::visit(AssignStmt& n) {
 	llvm::Value* rhsValue   = nullptr;
 	llvm::Value* lhsAddress = nullptr;
 
@@ -47,7 +58,7 @@ void LLVMCodegen::gen(AssignStmt& n) {
 	value = nullptr;
 }
 
-void LLVMCodegen::gen(ReturnStmt& n) {
+void Codegen::visit(ReturnStmt& n) {
 	if (!genCtx.currentFunc()) {
 		value = nullptr;
 		return;
@@ -75,7 +86,7 @@ void LLVMCodegen::gen(ReturnStmt& n) {
 
 /* ========== If / else chain ========== */
 
-void LLVMCodegen::gen(IfStmt& n) {
+void Codegen::visit(IfStmt& n) {
 	// lambda to normalize condition to bool (i1)
 	auto ensureBool = [&](llvm::Value* condVal) -> llvm::Value* {
 		if (!condVal) {
@@ -134,13 +145,14 @@ void LLVMCodegen::gen(IfStmt& n) {
 
 		genCtx.builder().CreateCondBr(condVal, thenBB, falseBB);
 
-		// Generate 'then' block
-		genCtx.builder().SetInsertPoint(thenBB);
-		bodyNode->accept(*this);
+	// Generate 'then' block
+	genCtx.builder().SetInsertPoint(thenBB);
+	bodyNode->accept(*this);
 		
-		if (!thenBB->getTerminator()) {
-			genCtx.builder().CreateBr(mergeBB);
-		}
+	llvm::BasicBlock* thenExit = genCtx.builder().GetInsertBlock();
+	if (thenExit && !thenExit->getTerminator()) {
+		genCtx.builder().CreateBr(mergeBB);
+	}
 
 		condBB = falseBB;
 	}
@@ -150,7 +162,8 @@ void LLVMCodegen::gen(IfStmt& n) {
 		value = nullptr;
 		genCtx.builder().SetInsertPoint(elseBB);
 		elseBlockNode->accept(*this);
-		if (!elseBB->getTerminator()) {
+		llvm::BasicBlock* elseExit = genCtx.builder().GetInsertBlock();
+		if (elseExit && !elseExit->getTerminator()) {
 			genCtx.builder().CreateBr(mergeBB);
 		}
 	}
@@ -159,4 +172,3 @@ void LLVMCodegen::gen(IfStmt& n) {
 	genCtx.builder().SetInsertPoint(mergeBB);
 	value = nullptr;
 }
-
