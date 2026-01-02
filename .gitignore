@@ -1,3 +1,5 @@
 src/compile_commands.json
 
 src/.cache/*
+.pytest_cache/
+__pycache__/
