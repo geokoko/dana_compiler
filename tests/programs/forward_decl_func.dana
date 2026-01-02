@@ -1,0 +1,9 @@
+def main
+    decl add is int: a b as int
+    def add is int: a b as int
+        return: a + b
+
+    var result is int
+    result := add(2, 3)
+    writeInteger: result
+    writeString: "\n"
