@@ -2,30 +2,89 @@ name: CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
 
 jobs:
-  build:
+  build-compiler:
     runs-on: ubuntu-latest
-
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential bison flex python3 python3-pip
+        # Install LLVM 18
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 18
+        # Ensure llvm-config-18 is usable
+        sudo apt-get install -y llvm-18 llvm-18-dev libllvm18 clang-18 libclang-rt-18-dev
+        # Symlink clang-18 to clang if not exists
+        sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+        sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
+        sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
+        rm llvm.sh
 
-      - name: Build
-        run: |
-          cd src
-          make      
+    - name: Build Compiler
+      run: |
+        cd src
+        make CXX=clang++-18 CC=clang-18
+        chmod +x danac
 
-      - name: Check build artifacts
-        run: |
-          if [ ! -x src/danac ]; then
-            echo "Executable not found at src/danac"
-            echo "Repo tree:"
-            ls -R .
-            exit 1
-          fi
+    - name: Generate Test Matrix
+      id: set-matrix
+      run: |
+        # Generate a JSON array of .dana filenames in tests/programs
+        TEST_FILES=$(python3 -c 'import os, glob, json; print(json.dumps([os.path.basename(f) for f in glob.glob("tests/programs/*.dana")]))')
+        echo "matrix=$TEST_FILES" >> $GITHUB_OUTPUT
+        echo "Found tests: $TEST_FILES"
 
+    - name: Upload Compiler Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: compiled-compiler
+        path: src/danac
+        retention-days: 1
 
+  test-suite:
+    needs: build-compiler
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test_file: ${{ fromJson(needs.build-compiler.outputs.matrix) }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
+    - name: Install Python Dependencies
+      run: pip install pytest
+
+    - name: Download Compiler Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: compiled-compiler
+        path: src
+
+    - name: Prepare Compiler Executable
+      run: |
+        chmod +x src/danac
+        ls -l src/danac
+
+    - name: Run Test Case
+      env:
+        CI_PREBUILT_EXECUTABLE: danac
+      run: |
+        # Run the specific test case corresponding to the file
+        pytest -v tests/test_compiler.py -k "${{ matrix.test_file }}"
