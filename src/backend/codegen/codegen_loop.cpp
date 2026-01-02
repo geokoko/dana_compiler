@@ -2,7 +2,7 @@
 
 /* ========== Loops ========== */
 
-void LLVMCodegen::gen(LoopStmt& n) {
+void Codegen::visit(LoopStmt& n) {
 	auto* curBB = genCtx.builder().GetInsertBlock();
 	auto* function = curBB ? genCtx.builder().GetInsertBlock()->getParent() : nullptr;
 	if (!function) {
@@ -40,7 +40,7 @@ void LLVMCodegen::gen(LoopStmt& n) {
 
 /* ========== Break / Continue ========== */
 
-void LLVMCodegen::gen(BreakStmt& n) {
+void Codegen::visit(BreakStmt& n) {
 	(void)n;
 	auto* breakTarget = genCtx.currentBreakTarget();
 	if (!breakTarget) {
@@ -60,7 +60,7 @@ void LLVMCodegen::gen(BreakStmt& n) {
 	value = nullptr;
 }
 
-void LLVMCodegen::gen(ContinueStmt& n) {
+void Codegen::visit(ContinueStmt& n) {
 	(void)n;
 	auto* continueTarget = genCtx.currentContinueTarget();
 	if (!continueTarget) {
@@ -79,4 +79,3 @@ void LLVMCodegen::gen(ContinueStmt& n) {
 	}
 	value = nullptr;
 }
-

@@ -43,26 +43,26 @@ static void print_usage(const char* prog) {
 int main(int argc, char** argv) {
 	bool want_tree = false;
 	const char* fname = nullptr;
-    llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
-    std::string optFlag = "-O0";
+	llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
+	std::string optFlag = "-O0";
 
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];
 		if (arg == "--ast-tree") {
 			want_tree = true;
 		} else if (arg == "-O0") {
-            optLevel = llvm::OptimizationLevel::O0;
-            optFlag = "-O0";
-        } else if (arg == "-O1") {
-            optLevel = llvm::OptimizationLevel::O1;
-            optFlag = "-O1";
-        } else if (arg == "-O2") {
-            optLevel = llvm::OptimizationLevel::O2;
-            optFlag = "-O2";
-        } else if (arg == "-O3") {
-            optLevel = llvm::OptimizationLevel::O3;
-            optFlag = "-O3";
-        } else if (!fname) {
+			optLevel = llvm::OptimizationLevel::O0;
+			optFlag = "-O0";
+		} else if (arg == "-O1") {
+			optLevel = llvm::OptimizationLevel::O1;
+			optFlag = "-O1";
+		} else if (arg == "-O2") {
+			optLevel = llvm::OptimizationLevel::O2;
+			optFlag = "-O2";
+		} else if (arg == "-O3") {
+			optLevel = llvm::OptimizationLevel::O3;
+			optFlag = "-O3";
+		} else if (!fname) {
 			fname = argv[i];
 		} else {
 			print_usage(argv[0]);
@@ -124,12 +124,12 @@ int main(int argc, char** argv) {
 
 	CodegenContext codegenCtx("dana_module");
 	genBuiltins(semCtx, codegenCtx);
-	LLVMCodegen generate(codegenCtx);
+	Codegen generate(codegenCtx);
 	ast_root->accept(generate);
 
 	Optimizer optimizer;
 	optimizer.optimize(codegenCtx.llvmModule(), optLevel);
-	
+
 	codegenCtx.llvmModule().print(llvm::outs(), nullptr);
 	llvm::outs().flush();
 

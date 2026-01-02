@@ -134,6 +134,16 @@ llvm::Value* CodegenContext::lookupValue(const Symbol* sym) {
 	const FuncSymbol* target = sym->definingFunc();
 	const FuncSymbol* walker = currentState.funcSym;
 	llvm::Value* ptr = currentState.framePtr;
+	if (!ptr) {
+		ptr = currentState.staticLink;
+		if (walker) {
+			walker = walker->definingFunc();
+		}
+	}
+
+	if (!ptr) {
+		return nullptr;
+	}
 
 	while (walker) {
 		const FrameInfo* info = getFrameInfo(walker);
@@ -208,4 +218,3 @@ llvm::Value* CodegenContext::currentFramePtr() const {
 llvm::Value* CodegenContext::currentStaticLink() const {
 	return funcStack_.empty() ? nullptr : funcStack_.back().staticLink;
 }
-

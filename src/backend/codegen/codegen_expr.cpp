@@ -1,135 +1,30 @@
 #include "codegen.hpp"
 
-#include <vector>
+#include <string>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
 
 #include "../../frontend/ast/ast.hpp"
-#include "../../frontend/symbol/symbol.hpp"
 
-/* ========== Constant expressions ========== */
+/* ========== L-Values (value -> address) ========== */
 
-void LLVMCodegen::gen(IntConst& n) {
-	value = genCtx.builder().getInt32(n.getValue());
-}
-
-void LLVMCodegen::gen(CharConst& n) {
-	value = genCtx.builder().getInt8(n.getValue());
-}
-
-void LLVMCodegen::gen(TrueConst& n) {
-	(void)n;
-	value = genCtx.builder().getInt8(1);
-}
-
-void LLVMCodegen::gen(FalseConst& n) {
-	(void)n;
-	value = genCtx.builder().getInt8(0);
-}
-
-/* ========== General expressions ========== */
-
-void LLVMCodegen::gen(LValueExpr& n) {
-	llvm::Value* addr = nullptr;
-	if (auto* lv = n.lvalue()) {
-		lv->accept(*this);
-		addr = value;
-	}
-	if (!addr) {
+void Codegen::visit(IdLVal& n) {
+	auto* sym = n.symbol();
+	if (!sym) {
 		value = nullptr;
 		return;
 	}
-	auto elemType = genCtx.getLLVMType(*n.type());
-	value = genCtx.builder().CreateLoad(elemType, addr);
+	value = genCtx.lookupValue(sym);
 }
 
-void LLVMCodegen::gen(ParenExpr& n) {
-	if (auto* inner = n.innerExpr()) {
-		inner->accept(*this);
-	} else {
-		value = nullptr;
-	}
-}
-
-void LLVMCodegen::gen(UnaryExpr& n) {
-	llvm::Value* operand = nullptr;
-	if (auto* expr = n.operandExpr()) {
-		expr->accept(*this);
-		operand = value;
-	}
-	if (!operand) {
-		value = nullptr;
-		return;
-	}
-
-	switch (n.opKind()) {
-		case UnOp::Plus:
-			value = operand;
-			break;
-		case UnOp::Minus:
-			value = genCtx.builder().CreateNeg(operand);
-			break;
-		case UnOp::Not:
-			value = genCtx.builder().CreateNot(operand);
-			break;
-	}
-}
-
-void LLVMCodegen::gen(BinaryExpr& n) {
-	llvm::Value* lhs = nullptr;
-	llvm::Value* rhs = nullptr;
-	if (auto* left = n.leftExpr()) {
-		left->accept(*this);
-		lhs = value;
-	}
-	if (auto* right = n.rightExpr()) {
-		right->accept(*this);
-		rhs = value;
-	}
-	if (!lhs || !rhs) {
-		value = nullptr;
-		return;
-	}
-
-	switch (n.opKind()) {
-		case BinOp::Add:
-			value = genCtx.builder().CreateAdd(lhs, rhs);
-			break;
-		case BinOp::Sub:
-			value = genCtx.builder().CreateSub(lhs, rhs);
-			break;
-		case BinOp::Mul:
-			value = genCtx.builder().CreateMul(lhs, rhs);
-			break;
-		case BinOp::Div:
-			value = genCtx.builder().CreateSDiv(lhs, rhs);
-			break;
-		case BinOp::Mod:
-			value = genCtx.builder().CreateSRem(lhs, rhs);
-			break;
-		case BinOp::AndBits:
-			value = genCtx.builder().CreateAnd(lhs, rhs);
-			break;
-		case BinOp::OrBits:
-			value = genCtx.builder().CreateOr(lhs, rhs);
-			break;
-		default:
-			value = nullptr;
-			break;
-	}
-}
-
-/* ========== Lvalues ========== */
-
-void LLVMCodegen::gen(IdLVal& n) {
-	value = genCtx.lookupValue(n.symbol());
-}
-
-void LLVMCodegen::gen(StringLiteralLVal& n) {
+void Codegen::visit(StringLiteralLVal& n) {
 	const std::string& literal = n.literal();
 	auto* constStr = llvm::ConstantDataArray::getString(
 		genCtx.llvmContext(), literal, true);
@@ -149,7 +44,7 @@ void LLVMCodegen::gen(StringLiteralLVal& n) {
 	value = global;
 }
 
-void LLVMCodegen::gen(IndexLVal& n) {
+void Codegen::visit(IndexLVal& n) {
 	llvm::Value* basePtr = nullptr;
 	if (auto* base = n.baseExpr()) {
 		base->accept(*this);
@@ -170,6 +65,9 @@ void LLVMCodegen::gen(IndexLVal& n) {
 		return;
 	}
 
+	// Now: 
+	// basePtr -> address of the array in memory
+	// indexVal -> evaluated expression inside brackets
 	// 32-bit index
 	if (!indexVal->getType()->isIntegerTy(32)) {
 		indexVal = genCtx.builder().CreateIntCast(indexVal, genCtx.builder().getInt32Ty(), true, "idx.cast");
@@ -205,4 +103,120 @@ void LLVMCodegen::gen(IndexLVal& n) {
 
 	// Fallback: treat basePtr as pointer to element type
 	value = genCtx.builder().CreateInBoundsGEP(elemTy, basePtr, indexVal, "idx.elem");
+}
+
+/* ========== R-Values (value -> const data result) ========== */
+
+void Codegen::visit(IntConst& n) {
+	value = llvm::ConstantInt::get(genCtx.llvmContext(), llvm::APInt(32, n.getValue(), true));
+}
+
+void Codegen::visit(CharConst& n) {
+	value = llvm::ConstantInt::get(genCtx.llvmContext(), llvm::APInt(8, n.getValue(), false));
+}
+
+void Codegen::visit(TrueConst& n) {
+	(void)n;	
+	value = llvm::ConstantInt::get(genCtx.llvmContext(), llvm::APInt(8, 1, false));
+}
+
+void Codegen::visit(FalseConst& n) {
+	(void)n;
+	value = llvm::ConstantInt::get(genCtx.llvmContext(), llvm::APInt(8, 0, false));
+}
+
+
+/* ========== Expressions -> (value -> data result) ========== */
+
+void Codegen::visit(LValueExpr& n) {
+	// Evaluate the LValue to get its address
+	n.lvalue()->accept(*this);
+	llvm::Value* addr = value;
+
+	if (!addr) {
+		return;
+	}
+
+	// Load the value from the address
+	auto semaTy = n.type();
+	llvm::Type* loadTy = genCtx.getLLVMType(*semaTy);
+
+	value = genCtx.builder().CreateLoad(loadTy, addr, "load.val");
+}
+
+void Codegen::visit(ParenExpr& n) {
+	if (auto* inner = n.innerExpr()) {
+		inner->accept(*this);
+	}
+}
+
+void Codegen::visit(UnaryExpr& n) {
+	n.operandExpr()->accept(*this);
+	llvm::Value* operand = value;
+
+	if (!operand) return;
+
+	switch (n.opKind()) {
+		case UnOp::Plus:
+			// No-op for integers
+			value = operand;
+			break;
+		case UnOp::Minus:
+			value = genCtx.builder().CreateNeg(operand, "neg");
+			break;
+		case UnOp::Not:
+			{
+				auto* zero = llvm::ConstantInt::get(operand->getType(), 0);
+				auto* isZero = genCtx.builder().CreateICmpEQ(operand, zero, "not.cmp");
+				// The result of ICmp is i1 (1-bit). We need to extend it back to i8 (byte).
+				value = genCtx.builder().CreateZExt(isZero, operand->getType(), "not.res");
+			}
+			break;
+	}
+}
+
+void Codegen::visit(BinaryExpr& n) {
+	n.leftExpr()->accept(*this);
+	llvm::Value* lhs = value;
+
+	n.rightExpr()->accept(*this);
+	llvm::Value* rhs = value;
+
+	if (!lhs || !rhs) {
+		value = nullptr;
+		return;
+	}
+
+	switch (n.opKind()) {
+		case BinOp::Add:
+			value = genCtx.builder().CreateAdd(lhs, rhs, "add");
+			break;
+		case BinOp::Sub:
+			value = genCtx.builder().CreateSub(lhs, rhs, "sub");
+			break;
+		case BinOp::Mul:
+			value = genCtx.builder().CreateMul(lhs, rhs, "mul");
+			break;
+		case BinOp::Div:
+			// Assuming signed division for 'int', unsigned for 'byte'
+			if (lhs->getType()->isIntegerTy(8)) {
+				value = genCtx.builder().CreateUDiv(lhs, rhs, "div.u");
+			} else {
+				value = genCtx.builder().CreateSDiv(lhs, rhs, "div.s");
+			}
+			break;
+		case BinOp::Mod:
+			if (lhs->getType()->isIntegerTy(8)) {
+				value = genCtx.builder().CreateURem(lhs, rhs, "rem.u");
+			} else {
+				value = genCtx.builder().CreateSRem(lhs, rhs, "rem.s");
+			}
+			break;
+		case BinOp::AndBits:
+			value = genCtx.builder().CreateAnd(lhs, rhs, "and");
+			break;
+		case BinOp::OrBits:
+			value = genCtx.builder().CreateOr(lhs, rhs, "or");
+			break;
+	}
 }
