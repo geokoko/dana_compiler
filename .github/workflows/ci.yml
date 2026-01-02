@@ -62,6 +62,15 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install Runtime Dependencies (LLVM)
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 18
+        sudo apt-get install -y llvm-18
+        sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
+        rm llvm.sh
     
     - name: Set up Python
       uses: actions/setup-python@v5
