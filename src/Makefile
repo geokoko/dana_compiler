@@ -6,6 +6,9 @@ CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -g
 
 # LLVM flags (using llvm 18)
 LLVM_CONFIG = llvm-config-18
+# Use llvm-as from the same LLVM install to keep bitcode version compatible.
+LLVM_BINDIR = $(shell $(LLVM_CONFIG) --bindir)
+LLVM_AS = $(LLVM_BINDIR)/llvm-as
 # Compile C++ using LLVM
 # Use -isystem instead of -I to suppress warnings from LLVM headers
 LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags --link-static | sed 's/-I/-isystem /g')
@@ -46,6 +49,10 @@ LEXER_H = $(LEXER_DIR)/lexer.hpp
 PARSER_CPP = $(PARSER_DIR)/parser.tab.cc
 PARSER_HH = $(PARSER_DIR)/parser.tab.hh
 PARSER_LOC = $(PARSER_DIR)/location.hh
+RUNTIME_BC = $(RUNTIME_DIR)/lib.bc
+RUNTIME_LL = $(RUNTIME_DIR)/lib.ll
+RUNTIME_BC_HDR = $(RUNTIME_DIR)/lib_bitcode.hpp
+RUNTIME_EMBED = $(RUNTIME_DIR)/embed_bitcode.py
 
 # Default target
 all: $(TARGET)
@@ -77,16 +84,27 @@ SRCS := main.cpp \
 runtime/lib.o: runtime/lib.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(RUNTIME_LL): $(RUNTIME_DIR)/lib.c
+	$(CC) $(CFLAGS) -g0 -S -emit-llvm -o $@ $<
+
+$(RUNTIME_BC): $(RUNTIME_LL)
+	$(LLVM_AS) -o $@ $<
+
+$(RUNTIME_BC_HDR): $(RUNTIME_BC) $(RUNTIME_EMBED)
+	python3 $(RUNTIME_EMBED) $< $@
+
 # object files
 OBJS := $(SRCS:.cpp=.o)
 
 # Link to LLVM and build main compiler executable
-$(TARGET): $(OBJS) runtime/lib.o
+$(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LLVM_LDFLAGS) $(LLVM_RPATH)
 
 # Compile source files
 %.o: %.cpp $(PARSER_HH) $(LEXER_H)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+main.o: $(RUNTIME_BC_HDR)
 
 # Generate parser with Bison
 $(PARSER_CPP) $(PARSER_HH): $(PARSER_DIR)/parser.y
@@ -103,13 +121,12 @@ clean:
 	rm -f $(TEST_DIR)/*.o \
 	rm -f *.out \
 	rm -f runtime/lib.o \
+	rm -f $(RUNTIME_BC) \
+	rm -f $(RUNTIME_LL) \
+	rm -f $(RUNTIME_BC_HDR) \
 		$(OBJS) $(TARGET) \
 		$(PARSER_CPP) $(PARSER_HH) \
 		$(LEXER_CPP) $(LEXER_H) \
 		$(PARSER_LOC)
 
-# Clean everything including the executable
-distclean: clean
-	rm -f $(TARGET)
-
-.PHONY: all clean distclean 
+.PHONY: all clean 
