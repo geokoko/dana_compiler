@@ -227,10 +227,13 @@ public:
     const vec<up<Def>>& localDefs() const { return locals; }
     Block* funcBody() const { return body.get(); }
     void print(std::ostream& out) const override;
+	bool isEntrypoint();
+	void setEntrypoint(bool cond);
 private:
     up<Header> header;
     vec<up<Def>> locals;
     up<Block> body;
+	bool isEntrypoint_;
 };
 
 // ===== Blocks and statements =====
@@ -274,8 +277,8 @@ private:
 class ProcCall : public Stmt {
 public:
     ProcCall(SourceLoc l, string id, vec<up<Expr>> a);
-    Symbol* symbol() const { return symbol_; }
-    void setSymbol(Symbol* sym) { symbol_ = sym; }
+    FuncSymbol* funcSymbol() const { return symbol_; }
+    void setFuncSymbol(FuncSymbol* sym) { symbol_ = sym; }
     void print(std::ostream& out) const override;
 	void accept(AstVisitor& v) override;
     const string& identifier() const { return name; }
@@ -284,7 +287,7 @@ private:
     string name;
     vec<up<Expr>> args;
 	// store associated symbol (callee)
-    Symbol* symbol_ = nullptr;
+    FuncSymbol* symbol_ = nullptr;
 };
 
 class BreakStmt : public Stmt {
@@ -443,8 +446,8 @@ private:
 class FuncCall : public Expr {
 public:
     FuncCall(SourceLoc l, string id, vec<up<Expr>> a);
-    const Symbol* symbol() const { return symbol_; }
-    void setSymbol(Symbol* sym) { symbol_ = sym; }
+    const FuncSymbol* funcSymbol() const { return symbol_; }
+    void setFuncSymbol(FuncSymbol* sym) { symbol_ = sym; }
     void accept(AstVisitor& v) override;
     void print(std::ostream& out) const override;
     const string& identifier() const { return name; }
@@ -453,7 +456,7 @@ private:
     string name;
     vec<up<Expr>> args;
 	// store associated symbol (callee)
-    Symbol* symbol_ = nullptr;
+    FuncSymbol* symbol_ = nullptr;
 };
 
 class UnaryExpr : public Expr {
