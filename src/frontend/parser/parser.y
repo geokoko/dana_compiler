@@ -349,8 +349,7 @@ expr
 
 cond
 	: expr                  					{ $$ = make_unique<ExprCond>(mkLoc(@$), std::move($1)); }
-	// | '(' cond ')'          					{ $$ = make_unique<ParenCond>(mkLoc(@$), std::move($2)); }		
-	// Removed it due to conflict with '(' expr ')'
+	| '(' cond ')'          					{ $$ = make_unique<ParenCond>(mkLoc(@$), std::move($2)); }
 	| T_NOT cond            					{ $$ = make_unique<NotCond>(mkLoc(@$), std::move($2)); }
 	| cond T_AND cond       					{ 
 		$$ = make_unique<BinaryCond>(mkLoc(@$), LogicOp::And, std::move($1), std::move($3)); 
