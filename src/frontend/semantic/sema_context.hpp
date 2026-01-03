@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "../common/source_location.hpp"
+#include "../common/diagnostics.hpp"
 #include "../symbol/symbol.hpp"
 #include "../symbol/symbol_table.hpp"
 #include "../symbol/sematype.hpp"
-#include "diagnostics.hpp"
 
 class ASTNode;
 

@@ -6,6 +6,7 @@
 	#include <string>
 
 	#include "../parser/parser.tab.hh"
+	#include "../common/diagnostics.hpp"
 	using dana::parser;
 
 	#define EMIT_AUTOEND_IF_NEEDED() \
@@ -255,8 +256,14 @@ ID_CHAR [a-zA-Z0-9_]
 <COMMENT>"*" 	 { yylloc->columns(1); }			//Track column if only '*' encountered
 <COMMENT>[^*\n]+ { yylloc->columns(yyleng); }		//Track column if code follows
 <COMMENT><<EOF>> {
-    fprintf(stderr, "Error: EOF reached inside a comment at line %d\n",
-			static_cast<int>(yylloc->begin.line));
+    if (auto* diag = dana::getGlobalDiagnostics()) {
+        diag->report(Diagnostics::Severity::Error,
+            static_cast<int>(yylloc->begin.line), 0,
+            "EOF reached inside a comment");
+    } else {
+        fprintf(stderr, "Error: EOF reached inside a comment at line %d\n",
+                static_cast<int>(yylloc->begin.line));
+    }
     exit(1);
 }
 
@@ -376,10 +383,17 @@ ID_CHAR [a-zA-Z0-9_]
 
 .						{ 
 	/* Error handling for illegal characters */
-	fprintf(stderr, "Error: Illegal character '%c' at line %d, column %d\n",
-			yytext[0],
+	if (auto* diag = dana::getGlobalDiagnostics()) {
+		diag->report(Diagnostics::Severity::Error,
 			static_cast<int>(yylloc->begin.line),
-			static_cast<int>(yylloc->begin.column));
+			static_cast<int>(yylloc->begin.column),
+			"Illegal character '%c'", yytext[0]);
+	} else {
+		fprintf(stderr, "Error: Illegal character '%c' at line %d, column %d\n",
+				yytext[0],
+				static_cast<int>(yylloc->begin.line),
+				static_cast<int>(yylloc->begin.column));
+	}
 	yylloc->columns(1);
 }
 
@@ -391,7 +405,11 @@ ID_CHAR [a-zA-Z0-9_]
 static inline void pushGuide (const char* guide_name, int guide_col, int guide_line) {
 	(void)guide_name;
 	if (cur_indent_level >= MAX_INDENT_LEVELS) {
-		fprintf(stderr, "Error: Too many nested levels at line %d\n", guide_line);
+		if (auto* diag = dana::getGlobalDiagnostics()) {
+			diag->report(Diagnostics::Severity::Error, guide_line, 0, "Too many nested levels");
+		} else {
+			fprintf(stderr, "Error: Too many nested levels at line %d\n", guide_line);
+		}
 		exit(1);
 	}
 
@@ -461,10 +479,18 @@ static inline char processEscape(const char* text, int pos, const parser::locati
 					return (char)(val1 * 16 + val2); // here returning ASCII char
 				}
 			}
-			fprintf(stderr, "Error: Invalid hex escape at line %d\n", line);
+			if (auto* diag = dana::getGlobalDiagnostics()) {
+				diag->report(Diagnostics::Severity::Error, line, 0, "Invalid hex escape sequence");
+			} else {
+				fprintf(stderr, "Error: Invalid hex escape at line %d\n", line);
+			}
 			return 0;
 		default:
-			fprintf(stderr, "Warning: Unknown escape sequence \\%c at line %d\n", escape_char, line);
+			if (auto* diag = dana::getGlobalDiagnostics()) {
+				diag->report(Diagnostics::Severity::Warning, line, 0, "Unknown escape sequence \\%c", escape_char);
+			} else {
+				fprintf(stderr, "Warning: Unknown escape sequence \\%c at line %d\n", escape_char, line);
+			}
 			return escape_char;
 	}
 }
