@@ -1,8 +1,9 @@
 #pragma once
+
 #include <string>
 #include <vector>
 
-#include "../common/source_location.hpp"
+#include "source_location.hpp"
 
 class Symbol;
 class Scope;
@@ -38,13 +39,25 @@ public:
 		std::string message;
 	};
 
+	// Set the source filename for better error messages
+	void setFilename(const std::string& filename);
+	const std::string& filename() const;
+
 	void report(Severity severity, Phase phase, const SourceLoc& loc, const std::string& message);
 
 	bool hasErrors() const;
+	int errorCount() const;
 	const std::vector<Entry>& entries() const;
 	void printAll() const;
 	void clearDiags();
 
 private:
 	std::vector<Entry> messages_;
+	std::string filename_;
 };
+
+// Global diagnostics instance for lexer/parser use
+extern Diagnostics* g_diagnostics;
+
+void setGlobalDiagnostics(Diagnostics* diags);
+Diagnostics* getGlobalDiagnostics();
