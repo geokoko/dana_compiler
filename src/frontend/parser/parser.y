@@ -135,15 +135,23 @@
 %type <optional<up<Block>>>					opt_else // optional Else block
 %type <optional<string>> 					opt_id	// optional identifier
 
-/* Define operator precedence */
+/* Acknowledge the shift/reduce conflict for '(' expr/cond ')' ambiguity.
+ * When parsing '(' expr ')', bison doesn't know whether to:
+ *   - shift ')' to complete expr : '(' expr ')'
+ *   - reduce expr to cond for cond : '(' cond ')'
+ * Bison's default (shift) gives the correct behavior. */
+%expect 1
+
+/* Define operator precedence (lowest to highest) */
 %left  T_OR          			/* || */
 %left  T_AND         			/* && */
 
 %left  '|'           			/* bitwise OR */
 %left  '&'           			/* bitwise AND */
 
-%nonassoc '=' T_NE   		 	/* ==, <> */
-%nonassoc '<' '>' T_LE T_GE  	/* <, >, <=, >= */
+/* Note: Comparison operators (=, <>, <, >, <=, >=) don't need precedence
+ * declarations because they only appear in rel_cond rules between two expr
+ * non-terminals, creating no ambiguity that precedence would resolve. */
 
 %left  '+' '-'
 %left  '*' '/' '%'
