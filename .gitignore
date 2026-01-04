@@ -3,3 +3,6 @@ src/compile_commands.json
 src/.cache/*
 .pytest_cache/
 __pycache__/
+
+# Generated executables
+a.out
