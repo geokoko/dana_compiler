@@ -130,4 +130,4 @@ clean:
 		$(LEXER_CPP) $(LEXER_H) \
 		$(PARSER_LOC)
 
-.PHONY: all clean 
+.PHONY: all clean

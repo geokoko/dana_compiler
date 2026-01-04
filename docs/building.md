@@ -1,6 +1,29 @@
-# Building and Using the Dana Compiler
+# Building and Installing the Dana Compiler
 
-## Prerequisites
+## Quick Installation (Automated)
+
+The easiest way - the Makefile detects your distro and installs dependencies automatically:
+
+```bash
+# Clone the repository
+git clone https://github.com/geokoko/dana_compiler.git
+cd dana_compiler
+
+# Install dependencies (auto-detects Ubuntu, Debian, Fedora, RHEL)
+make deps
+
+# Build and install system-wide
+sudo make install
+
+# Verify installation
+danac --help
+```
+
+The `make deps` target automatically detects your Linux distribution and installs the required packages using the appropriate package manager (apt, dnf, etc.).
+
+---
+
+## Manual Installation (if `make deps` doesn't work)
 
 ### Required Software
 
@@ -22,35 +45,34 @@ sudo dnf install llvm18-devel clang flex bison gcc-c++ python3-pytest
 sudo apt install llvm-18-dev clang flex bison g++ python3-pytest
 ```
 
-## Building the Compiler
+## Detailed Installation Steps
+
+The easiest way to get started:
 
 ```bash
+# Clone the repository
+git clone https://github.com/geokoko/dana_compiler.git
+cd dana_compiler
+
+# Install system-wide (builds and installs in one command)
+sudo make install
+
+# Or build and install to your home directory (no sudo needed)
+make PREFIX=~/.local install
+
+# Verify installation
+danac --help
+
+# Fallback: If the above don't work, run:
 cd src
 make
+# and compile with
+./danac <program>.dana
 ```
 
-This produces the `danac` compiler executable.
+**Note:** The `install` target automatically builds the compiler if needed, so you don't need to run `make` separately.
 
-### Build Targets
-
-```bash
-make              # Build the compiler
-make clean        # Remove all generated files
-```
-
-## Using the Compiler
-
-### Basic Usage
-
-```bash
-./danac <source.dana>
-```
-
-This compiles `source.dana` and produces:
-- `source.imm` - LLVM IR (intermediate representation)
-- `source.asm` - Assembly code
-- `source.o` - Object file
-- `a.out` - Executable (for now, every executable has this name)
+After installation, `danac` is available from anywhere in your system.
 
 ### Command-Line Options
 
@@ -67,16 +89,16 @@ This compiles `source.dana` and produces:
 
 ```bash
 # Compile with optimization
-./danac -O2 program.dana
+danac -O2 program.dana
 
 # View the AST
-./danac --ast-tree program.dana
+danac --ast-tree program.dana
 
 # View generated LLVM IR
-./danac --emit-ir program.dana
+danac --emit-ir program.dana
 
 # Compile and run
-./danac program.dana && ./a.out
+danac program.dana && ./a.out
 ```
 
 ## Running Programs
@@ -103,7 +125,7 @@ $ cat hello.dana
 def main
    writeString: "Hello, world!\n"
 
-$ ./danac hello.dana
+$ danac hello.dana
 Done.
 Generated:
   Intermediate: hello.imm
@@ -184,4 +206,32 @@ Solution: Install Bison 3.8+:
 wget http://ftp.gnu.org/gnu/bison/bison-3.8.tar.gz
 tar xf bison-3.8.tar.gz && cd bison-3.8
 ./configure && make && sudo make install
+```
+
+## Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make` | Build the compiler |
+| `make install` | Install to `/usr/local/bin` (requires sudo) |
+| `make uninstall` | Remove from `/usr/local/bin` |
+| `make test` | Run test suite |
+| `make clean` | Remove build artifacts |
+
+## Uninstalling
+
+To remove the installed compiler:
+
+```bash
+# From system installation
+sudo make uninstall
+
+# From local installation
+make PREFIX=~/.local uninstall
+```
+
+Or manually remove:
+```bash
+rm /usr/local/bin/danac        # System install
+rm ~/.local/bin/danac          # User install
 ```

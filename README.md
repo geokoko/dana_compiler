@@ -23,19 +23,6 @@ Comprehensive documentation is available in the [docs/](docs/) folder:
 - [Building and Usage](docs/building.md) - How to build and use the compiler
 - [API Reference](docs/api-reference.md) - Internal API documentation
 
-## Quick Start
-
-```bash
-# Build the compiler
-cd src && make
-
-# Compile a Dana program
-./danac <program_name>.dana
-
-# Run the generated executable
-./a.out
-``` 
-
 ## Example Programs
 
 ```dana
@@ -74,25 +61,54 @@ dana_compiler/
 └── dana2025.pdf              # Language specification
 ```
 
-## Building
+## Quick Start
 
-### Prerequisites
+### Option 1: Pre-built Binary (Recommended - No Build Required)
+
+Download the latest release from [GitHub Releases](https://github.com/YOUR_USERNAME/dana_compiler/releases):
+
+```bash
+# Download and extract
+wget https://github.com/geokoko/dana_compiler/releases/latest/download/danac-linux-x64.tar.gz
+tar xzf danac-linux-x64.tar.gz
+
+# Install system-wide
+sudo mv danac /usr/local/bin/
+
+# Use it!
+danac myprogram.dana && ./a.out
+```
+
+
+### Option 2: Build from Source
+
+```bash
+git clone https://github.com/geokoko/dana_compiler.git
+cd dana_compiler
+
+# Install dependencies (auto-detects your distro)
+make deps
+
+# Build and install
+sudo make install
+
+# Use it!
+danac myprogram.dana && ./a.out
+```
+
+#### Dependencies installed automatically
 
 - Clang (with C++17 support)
 - LLVM 18 (`llvm-config-18`)
 - Flex & Bison
 - Python 3 with pytest (for tests)
 
-### Build Commands
+#### Build Commands
 
 ```bash
-cd src
-make            # Build compiler from source
-make clean      # Clean all object files, generated IR, generated assembly
-```
-
-## Running Tests
-
-```bash
-pytest tests/ -v
+make            # Build compiler
+make install    # Install to /usr/local/bin (needs sudo)
+make uninstall  # Remove installation
+make test       # Run test suite
+make clean      # Clean build artifacts
 ```
