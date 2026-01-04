@@ -1,0 +1,10 @@
+(* Test: reference parameters *)
+def main
+  def increment: x as ref int
+    x := x + 1
+  
+  var n is int
+  n := 10
+  increment: n
+  writeInteger: n
+  writeString: "\n"

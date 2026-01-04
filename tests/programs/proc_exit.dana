@@ -1,0 +1,10 @@
+(* Test: procedure with exit statement *)
+def main
+  def printUntilZero: n as int
+    if n = 0: exit
+    writeInteger: n
+    writeString: " "
+    printUntilZero: n - 1
+  
+  printUntilZero: 5
+  writeString: "\n"

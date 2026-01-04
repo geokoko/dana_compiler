@@ -1,0 +1,17 @@
+(* Test: basic array operations *)
+def main
+  var arr is int [5]
+  var i is int
+  
+  i := 0
+  loop:
+    if i >= 5: break
+    arr[i] := i * i
+    i := i + 1
+  
+  writeInteger: arr[0]
+  writeString: " "
+  writeInteger: arr[2]
+  writeString: " "
+  writeInteger: arr[4]
+  writeString: "\n"

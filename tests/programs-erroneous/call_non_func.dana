@@ -1,0 +1,5 @@
+(* Error: calling non-function *)
+def main
+  var x is int
+  x := 5
+  x()

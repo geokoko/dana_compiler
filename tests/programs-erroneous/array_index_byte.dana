@@ -1,0 +1,6 @@
+(* Error: array index with wrong type *)
+def main
+  var arr is int [10]
+  var b is byte
+  b := 'A'
+  arr[b] := 5

@@ -1,0 +1,10 @@
+(* Test: loop with break *)
+def main
+  var i is int
+  i := 0
+  loop:
+    if i >= 5: break
+    writeInteger: i
+    writeString: " "
+    i := i + 1
+  writeString: "\n"
