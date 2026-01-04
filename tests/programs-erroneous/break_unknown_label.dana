@@ -1,0 +1,4 @@
+(* Error: break with unknown label *)
+def main
+  loop:
+    break: unknownLabel

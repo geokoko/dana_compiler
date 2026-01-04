@@ -1,65 +1,56 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
-#include "../common/source_location.hpp"
+#include "../common/diagnostics.hpp"
 #include "../symbol/symbol.hpp"
 #include "../symbol/symbol_table.hpp"
 #include "../symbol/sematype.hpp"
-#include "diagnostics.hpp"
 
-class ASTNode;
-
+/**
+ * SemContext - Lightweight wrapper for semantic analysis state.
+ * 
+ * Provides:
+ * - Access to the symbol table for symbol lookup/declaration
+ * - Access to diagnostics for error reporting
+ * - Function stack for tracking the current function context (for return type checking)
+ */
 class SemContext {
 public:
-    SemContext(SymbolTable& st, Diagnostics& d);
+	SemContext(SymbolTable& st, Diagnostics& d);
 
-	// accessors to symbol table and diagnostics
-    SymbolTable& symtab();
-    Diagnostics& diags();
+	// -------------------------------------------------------------------------
+	// Symbol table and diagnostics access
+	// -------------------------------------------------------------------------
+	SymbolTable& symtab();
+	Diagnostics& diags();
 	const SymbolTable& symtab() const;
 	const Diagnostics& diags() const;
 	bool hasErrors() const;
-	void printDiagnostics() const;
 
-	// api functions for managing scopes
-    void openScope();
-    void closeScope();
-    std::size_t scopeDepth() const;
+	// -------------------------------------------------------------------------
+	// Scope management (delegates to symbol table)
+	// -------------------------------------------------------------------------
+	void openScope();
+	void closeScope();
+	std::size_t scopeDepth() const;
 
-	// api function for looking up symbols
-    LookupResult lookupSymbol(const std::string& name) const;
-    LookupResult lookupLocalSymbol(const std::string& name) const;
-
-    // api function for adding symbols to the current scope
+	// -------------------------------------------------------------------------
+	// Symbol lookup and declaration
+	// -------------------------------------------------------------------------
+	LookupResult lookupSymbol(const std::string& name) const;
+	LookupResult lookupLocalSymbol(const std::string& name) const;
 	InsertResult declareSymbol(std::unique_ptr<Symbol> symbol, bool reportDuplicates = true);
 
+	// -------------------------------------------------------------------------
+	// Function context tracking (for return type validation)
+	// -------------------------------------------------------------------------
 	struct FunctionFrame {
-		Symbol* symbol = nullptr;
+		FuncSymbol* symbol = nullptr;
 		SemaTypePtr returnType;
 		bool isProcedure = false;
-	};
-
-	struct LoopFrame {
-		std::optional<std::string> label;
-	};
-
-	struct ParamInfo {
-		std::string name;
-		SourceLoc loc;
-		SemaTypePtr type;
-		Symbol::ParamPass passMode = Symbol::ParamPass::BY_VAL;
-	};
-
-	struct HeaderInfo {
-		std::string name;
-		SourceLoc loc;
-		bool isProcedure = false;
-		SemaTypePtr returnType;
-		std::vector<ParamInfo> params;
 	};
 
 	void enterFunction(FunctionFrame frame);
@@ -67,18 +58,8 @@ public:
 	FunctionFrame* currentFunction();
 	const FunctionFrame* currentFunction() const;
 
-	void pushLoop(std::optional<std::string> label);
-	void popLoop();
-	bool inLoop() const;
-	bool hasLoopLabel(const std::string& label) const;
-
-	void setHeaderInfo(HeaderInfo info);
-	std::optional<HeaderInfo> takeHeaderInfo();
-
 private:
-    SymbolTable& symtab_;
-    Diagnostics& diags_;
+	SymbolTable& symtab_;
+	Diagnostics& diags_;
 	std::vector<FunctionFrame> functionStack_;
-	std::vector<LoopFrame> loopStack_;
-	std::optional<HeaderInfo> headerInfo_;
 };

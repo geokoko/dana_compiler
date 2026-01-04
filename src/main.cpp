@@ -5,7 +5,7 @@
 
 #include "./frontend/ast/ast.hpp"
 #include "./frontend/parser/parser.tab.hh"
-#include "./frontend/semantic/diagnostics.hpp"
+#include "./frontend/common/diagnostics.hpp"
 #include "./frontend/semantic/semantic.hpp"
 #include "./frontend/semantic/sema_context.hpp"
 #include "./frontend/symbol/symbol_table.hpp"
@@ -122,6 +122,11 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	// Create global diagnostics before parsing so lexer/parser can use it
+	Diagnostics diags;
+	diags.setFilename(fname);
+	dana::setGlobalDiagnostics(&diags);
+
 	dana::parser::location_type loc;
 
 	std::string filename = fname;
@@ -136,6 +141,7 @@ int main(int argc, char** argv) {
 	std::fclose(yyin);
 
 	if (res != 0) {
+		diags.printAll();  // Print any accumulated lexer/parser errors
 		std::cerr << "Parsing finished: failure (parse() returned " << res << ").\n";
 		return res;
 	}
@@ -150,7 +156,6 @@ int main(int argc, char** argv) {
 	}
 
 	SymbolTable symtab;
-	Diagnostics diags;
 	SemContext semCtx(symtab, diags);
 	declareBuiltins(semCtx);
 
@@ -158,7 +163,7 @@ int main(int argc, char** argv) {
 	runControlFlowPass(*ast_root, semCtx);
 
 	if (semCtx.hasErrors()) {
-		semCtx.printDiagnostics();
+		semCtx.diags().printAll();
 		std::cerr << "Semantic analysis finished with errors.\n";
 		return 1;
 	}

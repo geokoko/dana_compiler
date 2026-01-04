@@ -1,0 +1,5 @@
+(* Error: exit in function *)
+def main
+  def myfunc is int
+    exit
+  writeInteger: myfunc()

@@ -1,0 +1,4 @@
+(* Error: duplicate variable in same scope *)
+def main
+  var x is int
+  var x is byte

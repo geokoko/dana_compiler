@@ -1,0 +1,5 @@
+(* Error: wrong number of arguments *)
+def main
+  def add is int: a b as int
+    return: a + b
+  writeInteger: add(1)

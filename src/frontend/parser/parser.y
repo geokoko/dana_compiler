@@ -34,6 +34,7 @@
 
 %code {
 	#include <iostream>
+	#include "../common/diagnostics.hpp"
 
 	extern int yylex(dana::parser::semantic_type* yylval, dana::parser::location_type* yylloc);
 
@@ -44,35 +45,64 @@
 
 	static void __attribute__((unused)) yyerror (const dana::parser::location_type& loc, const std::string& msg) {
 		SourceLoc here{ (int)loc.begin.line, (int)loc.begin.column };
-		std::cerr << here.line << ':' << here.col << ": " << msg << '\n';
+		if (auto* diag = dana::getGlobalDiagnostics()) {
+			diag->report(Diagnostics::Severity::Error, here.line, here.col, "%s", msg.c_str());
+		} else {
+			std::cerr << here.line << ':' << here.col << ": " << msg << '\n';
+		}
 	}
 
 	// Bison C++ interface expects this method on the parser class
 	void dana::parser::error(const dana::parser::location_type& loc, const std::string& msg) {
 		SourceLoc here{ (int)loc.begin.line, (int)loc.begin.column };
-		std::cerr << here.line << ':' << here.col << ": " << msg << '\n';
+		if (auto* diag = dana::getGlobalDiagnostics()) {
+			diag->report(Diagnostics::Severity::Error, here.line, here.col, "%s", msg.c_str());
+		} else {
+			std::cerr << here.line << ':' << here.col << ": " << msg << '\n';
+		}
 	}
 
 }
 
 /* KEYWORDS */
-%token T_AND T_AS T_BEGIN T_BREAK T_BYTE T_CONT T_DECL
-%token T_DEF T_ELIF T_ELSE T_END T_EXIT T_FALSE T_IF
-%token T_IS T_INT T_LOOP T_NOT T_OR T_REF T_RET
-%token T_SKIP T_TRUE T_VAR
+%token T_AND    "`and`"
+%token T_AS     "`as`"
+%token T_BEGIN  "`begin`"
+%token T_BREAK  "`break`"
+%token T_BYTE   "`byte`"
+%token T_CONT   "`continue`"
+%token T_DECL   "`decl`"
+%token T_DEF    "`def`"
+%token T_ELIF   "`elif`"
+%token T_ELSE   "`else`"
+%token T_END    "`end`"
+%token T_EXIT   "`exit`"
+%token T_FALSE  "`false`"
+%token T_IF     "`if`"
+%token T_IS     "`is`"
+%token T_INT    "`int`"
+%token T_LOOP   "`loop`"
+%token T_NOT    "`not`"
+%token T_OR     "`or`"
+%token T_REF    "`ref`"
+%token T_RET    "`return`"
+%token T_SKIP   "`skip`"
+%token T_TRUE   "`true`"
+%token T_VAR    "`var`"
 
-%token <int> T_INT_CONST
-%token <char> T_CHAR_CONST
-%token <string> T_STRING_CONST T_ID
+%token <int> T_INT_CONST      "`integer constant`"
+%token <char> T_CHAR_CONST    "`character constant`"
+%token <string> T_STRING_CONST "`string constant`"
+%token <string> T_ID          "`identifier`"
 
 /* Multi-character operators */
-%token T_ASSIGN 		// :=
-%token T_NE 			// <>
-%token T_LE				// <=
-%token T_GE				// >=
+%token T_ASSIGN "`:=`"
+%token T_NE     "`<>`"
+%token T_LE     "`<=`"
+%token T_GE     "`>=`"
 
 /* Special layout token */
-%token T_AUTO_END
+%token T_AUTO_END "`end of block`"
 
 /* Single character operator tokens are using their ASCII CODE as token code */
 
@@ -105,15 +135,23 @@
 %type <optional<up<Block>>>					opt_else // optional Else block
 %type <optional<string>> 					opt_id	// optional identifier
 
-/* Define operator precedence */
+/* Acknowledge the shift/reduce conflict for '(' expr/cond ')' ambiguity.
+ * When parsing '(' expr ')', bison doesn't know whether to:
+ *   - shift ')' to complete expr : '(' expr ')'
+ *   - reduce expr to cond for cond : '(' cond ')'
+ * Bison's default (shift) gives the correct behavior. */
+%expect 1
+
+/* Define operator precedence (lowest to highest) */
 %left  T_OR          			/* || */
 %left  T_AND         			/* && */
 
 %left  '|'           			/* bitwise OR */
 %left  '&'           			/* bitwise AND */
 
-%nonassoc '=' T_NE   		 	/* ==, <> */
-%nonassoc '<' '>' T_LE T_GE  	/* <, >, <=, >= */
+/* Note: Comparison operators (=, <>, <, >, <=, >=) don't need precedence
+ * declarations because they only appear in rel_cond rules between two expr
+ * non-terminals, creating no ambiguity that precedence would resolve. */
 
 %left  '+' '-'
 %left  '*' '/' '%'

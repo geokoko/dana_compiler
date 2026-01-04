@@ -1,0 +1,4 @@
+(* Error: assigning int to byte *)
+def main
+  var b is byte
+  b := 1000

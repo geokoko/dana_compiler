@@ -1,0 +1,5 @@
+(* Error: passing literal to ref parameter *)
+def main
+  def inc: x as ref int
+    x := x + 1
+  inc: 5

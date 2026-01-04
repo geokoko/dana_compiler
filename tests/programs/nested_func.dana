@@ -1,0 +1,9 @@
+(* Test: nested function definitions and calls *)
+def main
+  def outer is int: a as int
+    def inner is int: b as int
+      return: b * 2
+    return: inner(a) + 1
+  
+  writeInteger: outer(5)
+  writeString: "\n"

@@ -1,0 +1,5 @@
+(* Error: using function as procedure *)
+def main
+  def getValue is int
+    return: 42
+  getValue()

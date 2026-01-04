@@ -1,0 +1,14 @@
+(* Test: boolean operators and conditions *)
+def main
+  var a b is int
+  a := 5
+  b := 10
+  
+  if a < b and a > 0:
+    writeString: "AND works\n"
+  
+  if a > 100 or b = 10:
+    writeString: "OR works\n"
+  
+  if not (a = b):
+    writeString: "NOT works\n"

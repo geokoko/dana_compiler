@@ -61,9 +61,10 @@ all: $(TARGET)
 SRCS := main.cpp \
 		$(AST_DIR)/ast.cpp \
 		$(AST_DIR)/ast_print.cpp \
-		$(SEMANTIC_DIR)/semantic.cpp \
+		$(FRONTEND_DIR)/common/diagnostics.cpp \
+		$(SEMANTIC_DIR)/semantic_pass.cpp \
+		$(SEMANTIC_DIR)/control_flow.cpp \
 		$(SEMANTIC_DIR)/sema_context.cpp \
-		$(SEMANTIC_DIR)/diagnostics.cpp \
 		$(SYMBOL_DIR)/symbol.cpp \
 		$(SYMBOL_DIR)/symbol_table.cpp \
 		$(SYMBOL_DIR)/scope.cpp \
@@ -129,4 +130,4 @@ clean:
 		$(LEXER_CPP) $(LEXER_H) \
 		$(PARSER_LOC)
 
-.PHONY: all clean 
+.PHONY: all clean

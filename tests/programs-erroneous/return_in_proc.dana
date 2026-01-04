@@ -1,0 +1,4 @@
+(* Error: return in procedure *)
+def main
+  def myproc
+    return: 5

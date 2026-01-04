@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "../semantic/diagnostics.hpp"
+#include "../common/diagnostics.hpp"
 #include "symbol.hpp"
 
 class Scope {

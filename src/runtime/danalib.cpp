@@ -6,11 +6,29 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
 
+namespace {
+
+// Local helper structs for builtin declaration
+struct ParamInfo {
+	std::string name;
+	SourceLoc loc = SourceLoc::builtin();
+	SemaTypePtr type;
+	Symbol::ParamPass passMode = Symbol::ParamPass::BY_VAL;
+};
+
+struct HeaderInfo {
+	std::string name;
+	SourceLoc loc = SourceLoc::builtin();
+	bool isProcedure = false;
+	SemaTypePtr returnType;
+	std::vector<ParamInfo> params;
+};
+
+} // namespace
+
 void declareBuiltins(SemContext& ctx) {
-	SemContext::HeaderInfo info;
-	SemContext::ParamInfo param;
-	info.loc = SourceLoc::builtin();
-	param.loc = SourceLoc::builtin();
+	HeaderInfo info;
+	ParamInfo param;
 
 	for (std::size_t i = 0; i < sizeof(builtinTable) / sizeof(DanaBuiltin); ++i) {
 		switch (i) {

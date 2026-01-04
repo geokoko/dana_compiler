@@ -1,0 +1,17 @@
+(* Test: if-elif-else chains *)
+def main
+  def grade: score as int
+    if score >= 90:
+      writeString: "A"
+    elif score >= 80:
+      writeString: "B"
+    elif score >= 70:
+      writeString: "C"
+    else:
+      writeString: "F"
+  
+  grade: 95
+  grade: 85
+  grade: 75
+  grade: 50
+  writeString: "\n"

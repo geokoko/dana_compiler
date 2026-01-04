@@ -1,0 +1,15 @@
+(* Test: byte and char literals *)
+def main
+  var c is byte
+  
+  c := 'A'
+  writeChar: c
+  c := 'B'
+  writeChar: c
+  c := 'C'
+  writeChar: c
+  c := 'D'
+  writeChar: c
+  c := 'E'
+  writeChar: c
+  writeString: "\n"
