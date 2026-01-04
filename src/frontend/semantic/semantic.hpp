@@ -1,7 +1,8 @@
+// Convenience header that includes both semantic passes.
+// Individual headers can also be included directly:
+//   - semantic_pass.hpp  (symbol table, type checking)
+//   - control_flow.hpp   (return/exit/break/continue validation)
 #pragma once
 
-class Program;
-class SemContext;
-
-void runSemanticPass(Program& program, SemContext& context);
-void runControlFlowPass(Program& program, SemContext& context);
+#include "control_flow.hpp"
+#include "semantic_pass.hpp"

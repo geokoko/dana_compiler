@@ -62,7 +62,8 @@ SRCS := main.cpp \
 		$(AST_DIR)/ast.cpp \
 		$(AST_DIR)/ast_print.cpp \
 		$(FRONTEND_DIR)/common/diagnostics.cpp \
-		$(SEMANTIC_DIR)/semantic.cpp \
+		$(SEMANTIC_DIR)/semantic_pass.cpp \
+		$(SEMANTIC_DIR)/control_flow.cpp \
 		$(SEMANTIC_DIR)/sema_context.cpp \
 		$(SYMBOL_DIR)/symbol.cpp \
 		$(SYMBOL_DIR)/symbol_table.cpp \

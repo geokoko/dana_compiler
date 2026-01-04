@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
 	runControlFlowPass(*ast_root, semCtx);
 
 	if (semCtx.hasErrors()) {
-		semCtx.printDiagnostics();
+		semCtx.diags().printAll();
 		std::cerr << "Semantic analysis finished with errors.\n";
 		return 1;
 	}
