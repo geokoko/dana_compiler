@@ -45,7 +45,7 @@ uninstall:
 	rm -f $(BINDIR)/danac
 	@echo "Done!"
 
-test: build
+test:
 	pytest tests/ -v
 
 clean:
@@ -68,14 +68,20 @@ deps:
 deps-ubuntu:
 	@echo "Installing dependencies for Ubuntu/Debian..."
 	sudo apt-get update
-	sudo apt-get install -y \
-		clang \
-		llvm-18-dev \
-		flex \
-		bison \
-		g++ \
-		python3 \
-		python3-pytest
+	sudo apt-get install -y build-essential bison flex python3 python3-pip wget
+	# Install LLVM 18
+	wget https://apt.llvm.org/llvm.sh
+	chmod +x llvm.sh
+	sudo ./llvm.sh 18
+	sudo apt-get update || true
+	sudo apt-get install -y llvm-18 llvm-18-dev libllvm18 clang-18 libclang-rt-18-dev
+	# Create symlinks
+	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
+	sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
+	rm llvm.sh
+	# Install pytest
+	pip3 install pytest
 	@echo "Dependencies installed successfully!"
 
 # Fedora/RHEL dependencies
@@ -83,12 +89,20 @@ deps-fedora:
 	@echo "Installing dependencies for Fedora/RHEL..."
 	sudo dnf install -y \
 		clang \
+		llvm18 \
 		llvm18-devel \
+		llvm18-static \
 		flex \
 		bison \
 		gcc-c++ \
 		python3 \
-		python3-pytest
+		python3-pip
+	# Create symlinks if needed
+	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
+	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
+	sudo ln -sf /usr/bin/llc-18 /usr/bin/llc 2>/dev/null || true
+	# Install pytest
+	pip3 install pytest
 	@echo "Dependencies installed successfully!"
 
 help:

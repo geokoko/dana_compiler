@@ -19,30 +19,53 @@ sudo make install
 danac --help
 ```
 
-The `make deps` target automatically detects your Linux distribution and installs the required packages using the appropriate package manager (apt, dnf, etc.).
+The `make deps` target automatically detects your Linux distribution and installs the required packages using the appropriate package manager (apt and dnf supported).
 
 ---
 
-## Manual Installation (if `make deps` doesn't work)
+## Manual Installation
 
 ### Required Software
 
-- **C++ Compiler**: Clang with C++17 support
-- **LLVM**: Version 18 (headers and libraries)
+- **Build essentials**: gcc, g++, make
+- **C++ Compiler**: Clang 18 with C++17 support
+- **LLVM**: Version 18 (headers, libraries, and llc)
 - **Flex**: Lexer generator
 - **Bison**: Parser generator (version 3.8+)
-- **Python 3**: For running tests (pytest)
+- **Python 3**: With pip and pytest for running tests
+- **wget**: For downloading LLVM installation script
 
 ### Installation on Fedora/RHEL
 
 ```bash
-sudo dnf install llvm18-devel clang flex bison gcc-c++ python3-pytest
+sudo dnf install -y clang llvm18 llvm18-devel llvm18-static flex bison gcc-c++ python3 python3-pip
+sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
+sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
+pip3 install pytest
 ```
 
 ### Installation on Ubuntu/Debian
 
 ```bash
-sudo apt install llvm-18-dev clang flex bison g++ python3-pytest
+sudo apt-get update
+sudo apt-get install -y build-essential bison flex python3 python3-pip wget
+
+# Install LLVM 18 using official script
+wget https://apt.llvm.org/llvm.sh
+chmod +x llvm.sh
+sudo ./llvm.sh 18
+sudo apt-get update
+sudo apt-get install -y llvm-18 llvm-18-dev libllvm18 clang-18 libclang-rt-18-dev
+
+# Create symlinks
+sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
+sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
+rm llvm.sh
+
+# Install pytest
+pip3 install pytest
 ```
 
 ## Detailed Installation Steps
@@ -145,8 +168,17 @@ The compiler includes a test suite using pytest:
 
 ```bash
 cd /path/to/dana_compiler
+
+# Build the compiler first
+make
+
+# Run tests
+make test
+# or directly:
 pytest tests/ -v
 ```
+
+**Pytest auto-build behavior:** When you run `pytest tests/ -v` directly, the test fixture will rebuild the compiler (`make clean && make`) unless you provide a prebuilt binary via `CI_PREBUILT_EXECUTABLE=/path/to/danac` (e.g., `CI_PREBUILT_EXECUTABLE=src/danac`). Use that env var to skip rebuilding once you already have a compiled `danac`. 
 
 ### Test Categories
 
@@ -213,9 +245,10 @@ tar xf bison-3.8.tar.gz && cd bison-3.8
 | Target | Description |
 |--------|-------------|
 | `make` | Build the compiler |
-| `make install` | Install to `/usr/local/bin` (requires sudo) |
+| `make deps` | Install dependencies (auto-detects distro) |
+| `make install` | Build and install to `/usr/local/bin` (requires sudo) |
 | `make uninstall` | Remove from `/usr/local/bin` |
-| `make test` | Run test suite |
+| `make test` | Run test suite (requires prior build) |
 | `make clean` | Remove build artifacts |
 
 ## Uninstalling

@@ -78,14 +78,13 @@ sudo mv danac /usr/local/bin/
 danac myprogram.dana && ./a.out
 ```
 
-
 ### Option 2: Build from Source
 
 ```bash
 git clone https://github.com/geokoko/dana_compiler.git
 cd dana_compiler
 
-# Install dependencies (auto-detects your distro)
+# Install dependencies (auto-detects your distro: works for Fedora/RHEL, Ubuntu/Debian)
 make deps
 
 # Build and install
@@ -95,12 +94,15 @@ sudo make install
 danac myprogram.dana && ./a.out
 ```
 
+**Having issues?** See [Manual Installation](docs/building.md#manual-installation-if-make-deps-doesnt-work) for step-by-step instructions.
+
 #### Dependencies installed automatically
 
-- Clang (with C++17 support)
-- LLVM 18 (`llvm-config-18`)
+- Build essentials (gcc, g++, make)
+- Clang 18 (with C++17 support)
+- LLVM 18 (development libraries, llc)
 - Flex & Bison
-- Python 3 with pytest (for tests)
+- Python 3 with pip and pytest
 
 #### Build Commands
 
@@ -108,6 +110,48 @@ danac myprogram.dana && ./a.out
 make            # Build compiler
 make install    # Install to /usr/local/bin (needs sudo)
 make uninstall  # Remove installation
-make test       # Run test suite
+make test       # Run test suite (requires prior build)
 make clean      # Clean build artifacts
+```
+
+## Usage
+
+### Basic Compilation
+
+```bash
+# Compile a Dana program (generates a.out in current directory)
+danac program.dana
+
+# Run the compiled program
+./a.out
+```
+
+### Compiler Flags
+
+```bash
+danac [OPTIONS] <file.dana>
+
+Options:
+  --ast-tree       Print the abstract syntax tree after parsing
+  --emit-ir        Emit LLVM IR to stdout instead of compiling
+  -O0              No optimization (default)
+  -O1              Basic optimizations
+  -O2              Moderate optimizations
+  -O3              Aggressive optimizations
+```
+
+### Examples
+
+```bash
+# Compile with optimizations
+danac -O3 program.dana && ./a.out
+
+# View generated LLVM IR
+danac --emit-ir program.dana > program.ll
+
+# Debug: view AST structure
+danac --ast-tree program.dana
+
+# Compile and run with input
+./a.out < input.txt
 ```
