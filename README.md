@@ -3,7 +3,6 @@
 A compiler for the Dana programming language.
 Dana is an educational programming language designed as a semester project for the Compilers Course (8th semester) in ECE NTUA.
 
-[![Tests](https://img.shields.io/badge/tests-44%2F45%20passing-green)](https://github.com/geokoko/dana_compiler/actions)
 [![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)](https://en.cppreference.com/w/cpp/17)
 [![LLVM](https://img.shields.io/badge/LLVM-18-orange)](https://llvm.org/)
 
