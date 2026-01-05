@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	std::string immPath = change_extension(filename, ".imm");
+	std::string immPath = change_extension(filename, ".ll");
 	{
 		std::error_code EC;
 		llvm::raw_fd_ostream immOut(immPath, EC, llvm::sys::fs::OF_Text);
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
 
 	std::string objPath = change_extension(filename, ".o");
 	{
-		// Use clang to compile LLVM IR to object file (handles PIC automatically)
+		// Use clang to compile LLVM IR to object file
 		std::string cmd = "clang " + optFlag + " -c \"" + immPath + "\" -o \"" + objPath + "\"";
 		if (!run_command(cmd)) {
 			std::cerr << "Failed to generate object file (.o).\n";
