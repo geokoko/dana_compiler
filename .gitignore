@@ -6,3 +6,24 @@ __pycache__/
 
 # Generated executables
 a.out
+
+# Build artifacts - object files
+*.o
+*.bc
+
+# Build artifacts - generated source files
+src/frontend/lexer/lexer.cpp
+src/frontend/lexer/lexer.hpp
+src/frontend/parser/parser.tab.cc
+src/frontend/parser/parser.tab.hh
+src/frontend/parser/location.hh
+src/runtime/lib.ll
+src/runtime/lib_bitcode.hpp
+
+# Compiled binary
+src/danac
+
+# Test program artifacts
+tests/programs/*.ll
+tests/programs/*.asm
+tests/programs/*.o

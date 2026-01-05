@@ -102,6 +102,11 @@ def test_dana_program(compiler, dana_file):
             actual_stripped = out.strip()
             expected_stripped = expected_output.strip()
 
+            # Always print expected and actual for visibility
+            print(f"\n=== {base_name} ===")
+            print(f"Expected:\n{expected_stripped}")
+            print(f"\nActual:\n{actual_stripped}")
+
             if actual_stripped != expected_stripped:
                 diff = list(difflib.unified_diff(
                     expected_stripped.splitlines(),
@@ -112,6 +117,8 @@ def test_dana_program(compiler, dana_file):
                 ))
                 diff_text = "\n".join(diff)
                 pytest.fail(f"Output mismatch for {base_name}:\n{diff_text}")
+        else:
+            pytest.warns(None, match=f"No .result file for {base_name} — skipping output verification")
 
     finally:
         # Cleanup a.out
