@@ -1,0 +1,60 @@
+def char1
+
+   def correct
+      writeString: "\n---\n"
+      writeString: "$\na\\\na41923oaoch\n"
+
+   def lala is byte: c as byte, d as ref byte
+      if c > d:
+         return: c
+      else:
+         return: d
+
+   var c d e is byte
+   var s is byte[10]
+   var i is int
+
+   c := '$'
+   d := '\n'
+
+   writeChar: c
+   writeChar: d
+   writeChar: 'a'
+   writeChar: '\\'
+   writeChar: '\n'
+   
+   writeChar: lala('a', d)
+   
+   i := 0
+   loop:
+     s[i] := shrink(extend('1') + i)
+     i := i + 1
+     if i > 8:
+       s[i] := '\0'
+       break
+   
+   i := 3
+   c := s[i]
+   d := s[0]
+   e := s[8]
+   
+   writeChar: c
+   writeChar: d
+   writeChar: e
+   
+   i := 1
+   writeChar: s[i]
+   writeChar: s[2]
+   
+   i := 3
+   c := "coco"[i]
+   writeChar: c
+   writeChar: "lala"[i]
+   
+   c := "coco"[1]
+   writeChar: c
+   writeChar: "coco"[2]
+   
+   writeChar: lala("haha"[2], s[1])
+   
+   correct

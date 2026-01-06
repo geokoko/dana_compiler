@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	std::string immPath = change_extension(filename, ".imm");
+	std::string immPath = change_extension(filename, ".ll");
 	{
 		std::error_code EC;
 		llvm::raw_fd_ostream immOut(immPath, EC, llvm::sys::fs::OF_Text);
@@ -203,7 +203,8 @@ int main(int argc, char** argv) {
 	}
 	std::string asmPath = change_extension(filename, ".asm");
 	{
-		std::string cmd = "llc " + optFlag + " -filetype=asm \"" + immPath + "\" -o \"" + asmPath + "\"";
+		// Use clang to compile LLVM IR to assembly
+		std::string cmd = "clang " + optFlag + " -S \"" + immPath + "\" -o \"" + asmPath + "\"";
 		if (!run_command(cmd)) {
 			std::cerr << "Failed to generate assembly (.asm).\n";
 			return 1;
@@ -212,7 +213,8 @@ int main(int argc, char** argv) {
 
 	std::string objPath = change_extension(filename, ".o");
 	{
-		std::string cmd = "llc " + optFlag + " -filetype=obj \"" + immPath + "\" -o \"" + objPath + "\"";
+		// Use clang to compile LLVM IR to object file
+		std::string cmd = "clang " + optFlag + " -c \"" + immPath + "\" -o \"" + objPath + "\"";
 		if (!run_command(cmd)) {
 			std::cerr << "Failed to generate object file (.o).\n";
 			return 1;
