@@ -17,16 +17,28 @@ def main
         return: res
 
     var is_pal is byte
-    var input is byte [31]
+    var count is int
+    var tests is byte [5][6]
 
-    writeString: "Give a string with maximum length 30: "
-    readString: 31, input
+    strcpy: tests[0], "abbaa"
+    strcpy: tests[1], "baada"
+    strcpy: tests[2], "lolol"
+    strcpy: tests[3], "abcba"
+    strcpy: tests[4], "hello"
 
-    is_pal := check_pal(input)
+    count := 0
 
-    if is_pal = true:
-        writeString: input
-        writeString: " ... is palindrome\n"
-    else:
-        writeString: input
-        writeString: " ... is not palindrome\n"
+    loop:
+        if count > 4:
+            break
+
+        is_pal := check_pal(tests[count])
+
+        if is_pal = true:
+            writeString: tests[count]
+            writeString: " ... is palindrome\n"
+        else:
+            writeString: tests[count]
+            writeString: " ... is not palindrome\n"
+
+        count := count + 1
