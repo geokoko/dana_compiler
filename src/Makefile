@@ -1,8 +1,8 @@
 # Toolchain
 CXX = clang++
 CC = clang
-CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -g -Wno-unused-parameter
-CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -g
+CXXFLAGS ?= -std=c++17 -Wall -Wextra -Wpedantic -g -Wno-unused-parameter -fPIE
+CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -g -fPIE
 
 # LLVM flags (using llvm 18)
 LLVM_CONFIG = llvm-config-18
