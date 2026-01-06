@@ -3,6 +3,7 @@ import os
 import subprocess
 import glob
 import difflib
+import warnings
 
 # Paths
 TESTS_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -118,7 +119,10 @@ def test_dana_program(compiler, dana_file):
                 diff_text = "\n".join(diff)
                 pytest.fail(f"Output mismatch for {base_name}:\n{diff_text}")
         else:
-            pytest.warns(None, match=f"No .result file for {base_name} — skipping output verification")
+            warnings.warn(
+                f"No .result file for {base_name} — skipping output verification",
+                UserWarning,
+            )
 
     finally:
         # Cleanup a.out
