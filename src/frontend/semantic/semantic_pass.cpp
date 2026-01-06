@@ -816,8 +816,14 @@ void SemanticPass::visit(ExprCond& n) {
 	if (auto* expr = n.expression()) {
 		expr->accept(*this);
 	}
-	// Dana does not allow bare expressions as conditions; 
+	// Dana does not allow bare expressions as conditions - except boolean literals; 
 	// conditions must be relational (=, <>, <, >, <=, >=) or logical (and, or, not)
+	// for variables of type byte.
+	if (dynamic_cast<TrueConst*>(n.expression()) ||
+		dynamic_cast<FalseConst*>(n.expression())) {
+		n.setType(makeByteType());
+		return;
+	}
 	context_.diags().report(Diagnostics::Severity::Error, Diagnostics::Phase::Semantic,
 					  n.loc, "bare expression cannot be used as condition");
 	n.setType(makeByteType());
