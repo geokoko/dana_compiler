@@ -87,7 +87,7 @@ git clone https://github.com/geokoko/dana_compiler.git
 cd dana_compiler
 
 # Install dependencies (auto-detects your package manager)
-# Supports: Ubuntu/Debian (apt), Fedora/RHEL (dnf/yum), Arch (pacman), openSUSE (zypper)
+# Supports: Ubuntu/Debian (apt), Fedora/RHEL (dnf/yum)
 make deps
 
 # Build and install
