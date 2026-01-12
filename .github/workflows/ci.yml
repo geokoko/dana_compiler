@@ -32,7 +32,6 @@ jobs:
         # Symlink clang-18 to clang if not exists
         sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
         sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-        sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
         rm llvm.sh
 
     - name: Build Compiler
@@ -67,19 +66,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Runtime Dependencies (LLVM)
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 18
-        sudo apt-get install -y llvm-18
-        sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
-        rm llvm.sh
+    # Note: The compiler itself was built once in build-compiler job and is reused here
+    # No additional runtime dependencies needed - clang handles compilation
     
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+        cache: 'pip'
 
     - name: Install Python Dependencies
       run: pip install pytest
