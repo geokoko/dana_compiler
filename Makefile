@@ -1,7 +1,7 @@
 # Dana Compiler - Top-level Makefile
 # Usage:
 #   make            - Build the compiler
-#   make deps       - Install dependencies (detects distro automatically)
+#   make deps       - Install dependencies (detects package manager automatically)
 #   make install    - Build and install to /usr/local/bin (requires sudo)
 #   make uninstall  - Remove from /usr/local/bin
 #   make test       - Run test suite
@@ -10,24 +10,32 @@
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 
-# Detect Linux distribution
+# Detect Linux distribution / package manager
 ifeq ($(shell uname -s),Linux)
-  ifeq ($(shell test -f /etc/os-release && grep -q '^ID=ubuntu' /etc/os-release && echo ubuntu),ubuntu)
-    DISTRO := ubuntu
-  else ifeq ($(shell test -f /etc/os-release && grep -q '^ID_LIKE=.*debian' /etc/os-release && echo debian),debian)
-    DISTRO := debian
-  else ifeq ($(shell test -f /etc/os-release && grep -q '^ID=fedora' /etc/os-release && echo fedora),fedora)
-    DISTRO := fedora
-  else ifeq ($(shell test -f /etc/os-release && grep -q '^ID=rhel' /etc/os-release && echo rhel),rhel)
-    DISTRO := fedora
+
+  # Package manager detection (checks for actual package manager commands)
+  ifneq ($(shell command -v apt-get >/dev/null 2>&1 && echo apt),)
+    PKG_MGR := apt
+  else ifneq ($(shell command -v apt >/dev/null 2>&1 && echo apt),)
+    PKG_MGR := apt
+  else ifneq ($(shell command -v dnf >/dev/null 2>&1 && echo dnf),)
+    PKG_MGR := dnf
+  else ifneq ($(shell command -v yum >/dev/null 2>&1 && echo yum),)
+    PKG_MGR := yum
+  else ifneq ($(shell command -v pacman >/dev/null 2>&1 && echo pacman),)
+    PKG_MGR := pacman
+  else ifneq ($(shell command -v zypper >/dev/null 2>&1 && echo zypper),)
+    PKG_MGR := zypper
   else
-    DISTRO := unknown
+    PKG_MGR := unknown
   endif
+
 else
-  DISTRO := unknown
+  PKG_MGR := unknown
 endif
 
-.PHONY: all build install uninstall test clean help deps deps-ubuntu deps-fedora
+
+.PHONY: all build install uninstall test clean help deps deps-ubuntu deps-fedora deps-arch deps-opensuse
 
 all: build
 
@@ -51,16 +59,20 @@ test:
 clean:
 	$(MAKE) -C src clean
 
-# Detect and install dependencies automatically
+# Detect and install dependencies automatically based on package manager
 deps:
-	@echo "Detected system: $(DISTRO)"
-	@if [ "$(DISTRO)" = "ubuntu" ] || [ "$(DISTRO)" = "debian" ]; then \
+	@echo "Detected package manager: $(PKG_MGR)"
+	@if [ "$(PKG_MGR)" = "apt" ]; then \
 		$(MAKE) deps-ubuntu; \
-	elif [ "$(DISTRO)" = "fedora" ]; then \
+	elif [ "$(PKG_MGR)" = "dnf" ] || [ "$(PKG_MGR)" = "yum" ]; then \
 		$(MAKE) deps-fedora; \
+	elif [ "$(PKG_MGR)" = "pacman" ]; then \
+		$(MAKE) deps-arch; \
+	elif [ "$(PKG_MGR)" = "zypper" ]; then \
+		$(MAKE) deps-opensuse; \
 	else \
-		echo "ERROR: Unable to detect Linux distro. Please install dependencies manually."; \
-		echo "See docs/building.md for manual installation instructions."; \
+		echo "Unsupported or unknown package manager. Please install dependencies manually."; \
+		echo "Required packages: clang, llvm 18, bison, flex, python3, python3-pip"; \
 		exit 1; \
 	fi
 
@@ -78,7 +90,6 @@ deps-ubuntu:
 	# Create symlinks
 	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
 	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-	sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
 	rm llvm.sh
 	# Install pytest
 	pip3 install pytest
@@ -100,7 +111,30 @@ deps-fedora:
 	# Create symlinks if needed
 	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
 	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
-	sudo ln -sf /usr/bin/llc-18 /usr/bin/llc 2>/dev/null || true
+	# Install pytest
+	pip3 install pytest
+	@echo "Dependencies installed successfully!"
+
+# Arch Linux dependencies (untested)
+deps-arch:
+	@echo "Installing dependencies for Arch Linux..."
+	sudo pacman -Syu --noconfirm
+	sudo pacman -S --noconfirm base-devel llvm18 clang bison flex python python-pip
+	# Create symlinks if needed
+	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
+	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
+	# Install pytest
+	pip3 install pytest --break-system-packages 2>/dev/null || pip3 install pytest
+	@echo "Dependencies installed successfully!"
+
+# openSUSE dependencies (untested)
+deps-opensuse:
+	@echo "Installing dependencies for openSUSE..."
+	sudo zypper refresh
+	sudo zypper install -y llvm18 llvm18-devel clang18 bison flex gcc-c++ python3 python3-pip
+	# Create symlinks if needed
+	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
+	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
 	# Install pytest
 	pip3 install pytest
 	@echo "Dependencies installed successfully!"
@@ -110,9 +144,11 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  make            - Build the compiler"
-	@echo "  make deps       - Install dependencies (auto-detects distro)"
-	@echo "  make deps-ubuntu- Install Ubuntu/Debian dependencies"
-	@echo "  make deps-fedora- Install Fedora/RHEL dependencies"
+	@echo "  make deps       - Install dependencies (auto-detects package manager)"
+	@echo "  make deps-ubuntu- Install Ubuntu/Debian dependencies (apt)"
+	@echo "  make deps-fedora- Install Fedora/RHEL dependencies (dnf/yum)"
+	@echo "  make deps-arch  - Install Arch Linux dependencies (pacman)"
+	@echo "  make deps-opensuse - Install openSUSE dependencies (zypper)"
 	@echo "  make install    - Build and install to $(BINDIR) (may need sudo)"
 	@echo "  make uninstall  - Remove installation"
 	@echo "  make test       - Run test suite"

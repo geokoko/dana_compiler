@@ -2,14 +2,15 @@
 
 ## Quick Installation (Automated)
 
-The easiest way - the Makefile detects your distro and installs dependencies automatically:
+The easiest way - the Makefile detects your package manager and installs dependencies automatically:
 
 ```bash
 # Clone the repository
 git clone https://github.com/geokoko/dana_compiler.git
 cd dana_compiler
 
-# Install dependencies (auto-detects Ubuntu, Debian, Fedora, RHEL)
+# Install dependencies (auto-detects package manager)
+# Supports: apt, dnf, yum, pacman, zypper
 make deps
 
 # Build and install system-wide
@@ -19,7 +20,11 @@ sudo make install
 danac --help
 ```
 
-The `make deps` target automatically detects your Linux distribution and installs the required packages using the appropriate package manager (apt and dnf supported).
+The `make deps` target automatically detects your package manager and installs the required packages. Supported distributions:
+- **Ubuntu/Debian** (apt/apt-get)
+- **Fedora/RHEL/CentOS** (dnf/yum)
+- **Arch Linux/Manjaro** (pacman)
+- **openSUSE** (zypper)
 
 ---
 
@@ -29,21 +34,11 @@ The `make deps` target automatically detects your Linux distribution and install
 
 - **Build essentials**: gcc, g++, make
 - **C++ Compiler**: Clang 18 with C++17 support
-- **LLVM**: Version 18 (headers, libraries, and llc)
+- **LLVM**: Version 18 (headers and libraries)
 - **Flex**: Lexer generator
 - **Bison**: Parser generator (version 3.8+)
 - **Python 3**: With pip and pytest for running tests
 - **wget**: For downloading LLVM installation script
-
-### Installation on Fedora/RHEL
-
-```bash
-sudo dnf install -y clang llvm18 llvm18-devel llvm18-static flex bison gcc-c++ python3 python3-pip
-sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
-sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
-pip3 install pytest
-```
 
 ### Installation on Ubuntu/Debian
 
@@ -61,10 +56,38 @@ sudo apt-get install -y llvm-18 llvm-18-dev libllvm18 clang-18 libclang-rt-18-de
 # Create symlinks
 sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
 sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
 rm llvm.sh
 
 # Install pytest
+pip3 install pytest
+```
+
+### Installation on Fedora/RHEL
+
+```bash
+sudo dnf install -y clang llvm18 llvm18-devel llvm18-static flex bison gcc-c++ python3 python3-pip
+sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
+pip3 install pytest
+```
+
+### Installation on Arch Linux
+
+```bash
+sudo pacman -Syu
+sudo pacman -S base-devel llvm18 clang bison flex python python-pip
+sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
+pip3 install pytest --break-system-packages
+```
+
+### Installation on openSUSE
+
+```bash
+sudo zypper refresh
+sudo zypper install -y llvm18 llvm18-devel clang18 bison flex gcc-c++ python3 python3-pip
+sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
+sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
 pip3 install pytest
 ```
 
@@ -245,7 +268,11 @@ tar xf bison-3.8.tar.gz && cd bison-3.8
 | Target | Description |
 |--------|-------------|
 | `make` | Build the compiler |
-| `make deps` | Install dependencies (auto-detects distro) |
+| `make deps` | Install dependencies (auto-detects package manager) |
+| `make deps-ubuntu` | Install Ubuntu/Debian dependencies (apt) |
+| `make deps-fedora` | Install Fedora/RHEL dependencies (dnf/yum) |
+| `make deps-arch` | Install Arch Linux dependencies (pacman) |
+| `make deps-opensuse` | Install openSUSE dependencies (zypper) |
 | `make install` | Build and install to `/usr/local/bin` (requires sudo) |
 | `make uninstall` | Remove from `/usr/local/bin` |
 | `make test` | Run test suite (requires prior build) |
