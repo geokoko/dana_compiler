@@ -80,7 +80,8 @@ deps:
 deps-ubuntu:
 	@echo "Installing dependencies for Ubuntu/Debian..."
 	sudo apt-get update
-	sudo apt-get install -y build-essential bison flex python3 python3-pip wget
+	# lsb-release is required by llvm.sh script
+	sudo apt-get install -y build-essential bison flex python3 python3-pip wget lsb-release software-properties-common gnupg
 	# Install LLVM 18
 	wget https://apt.llvm.org/llvm.sh
 	chmod +x llvm.sh
@@ -92,7 +93,7 @@ deps-ubuntu:
 	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
 	rm llvm.sh
 	# Install pytest
-	pip3 install pytest
+	pip3 install pytest --break-system-packages 2>/dev/null || pip3 install pytest
 	@echo "Dependencies installed successfully!"
 
 # Fedora/RHEL dependencies
@@ -100,41 +101,32 @@ deps-fedora:
 	@echo "Installing dependencies for Fedora/RHEL..."
 	sudo dnf install -y \
 		clang \
-		llvm18 \
-		llvm18-devel \
-		llvm18-static \
+		llvm \
+		llvm-devel \
+		llvm-static \
 		flex \
 		bison \
 		gcc-c++ \
 		python3 \
 		python3-pip
-	# Create symlinks if needed
-	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
-	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
 	# Install pytest
 	pip3 install pytest
 	@echo "Dependencies installed successfully!"
 
-# Arch Linux dependencies (untested)
+# Arch Linux dependencies
 deps-arch:
 	@echo "Installing dependencies for Arch Linux..."
 	sudo pacman -Syu --noconfirm
-	sudo pacman -S --noconfirm base-devel llvm18 clang bison flex python python-pip
-	# Create symlinks if needed
-	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
-	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
+	sudo pacman -S --noconfirm base-devel llvm clang bison flex python python-pip
 	# Install pytest
 	pip3 install pytest --break-system-packages 2>/dev/null || pip3 install pytest
 	@echo "Dependencies installed successfully!"
 
-# openSUSE dependencies (untested)
+# openSUSE dependencies
 deps-opensuse:
 	@echo "Installing dependencies for openSUSE..."
 	sudo zypper refresh
-	sudo zypper install -y llvm18 llvm18-devel clang18 bison flex gcc-c++ python3 python3-pip
-	# Create symlinks if needed
-	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
-	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
+	sudo zypper install -y llvm-devel clang bison flex gcc-c++ python3 python3-pip
 	# Install pytest
 	pip3 install pytest
 	@echo "Dependencies installed successfully!"
