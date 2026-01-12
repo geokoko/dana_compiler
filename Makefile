@@ -82,8 +82,8 @@ deps-ubuntu:
 	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
 	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
 	rm llvm.sh
-	# Install pytest (user install to avoid system package conflicts)
-	pip3 install --user pytest
+	# Install pytest via apt (avoids PEP 668 externally-managed-environment issues)
+	sudo apt-get install -y python3-pytest
 	@echo "Dependencies installed successfully!"
 
 # Fedora/RHEL dependencies (requires LLVM 18)
@@ -98,10 +98,10 @@ deps-fedora:
 		flex \
 		bison \
 		gcc-c++ \
+		zlib-devel \
+		ncurses-devel \
 		python3 \
-		python3-pip
-	# Install pytest
-	pip3 install --user pytest
+		python3-pytest
 	@echo "Dependencies installed successfully!"
 
 help:
