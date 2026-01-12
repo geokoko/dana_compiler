@@ -1,7 +1,7 @@
 # Dana Compiler - Top-level Makefile
 # Usage:
 #   make            - Build the compiler
-#   make deps       - Install dependencies (detects distro automatically)
+#   make deps       - Install dependencies (detects package manager automatically)
 #   make install    - Build and install to /usr/local/bin (requires sudo)
 #   make uninstall  - Remove from /usr/local/bin
 #   make test       - Run test suite
@@ -10,22 +10,24 @@
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 
-# Detect Linux distribution
+# Detect Linux distribution / package manager
 ifeq ($(shell uname -s),Linux)
-  ifeq ($(shell test -f /etc/os-release && grep -q '^ID=ubuntu' /etc/os-release && echo ubuntu),ubuntu)
-    DISTRO := ubuntu
-  else ifeq ($(shell test -f /etc/os-release && grep -q '^ID_LIKE=.*debian' /etc/os-release && echo debian),debian)
-    DISTRO := debian
-  else ifeq ($(shell test -f /etc/os-release && grep -q '^ID=fedora' /etc/os-release && echo fedora),fedora)
-    DISTRO := fedora
-  else ifeq ($(shell test -f /etc/os-release && grep -q '^ID=rhel' /etc/os-release && echo rhel),rhel)
-    DISTRO := fedora
+
+  # Package manager detection
+  ifneq ($(shell command -v apt-get >/dev/null 2>&1 && echo apt),)
+    PKG_MGR := apt
+  else ifneq ($(shell command -v dnf >/dev/null 2>&1 && echo dnf),)
+    PKG_MGR := dnf
+  else ifneq ($(shell command -v yum >/dev/null 2>&1 && echo yum),)
+    PKG_MGR := yum
   else
-    DISTRO := unknown
+    PKG_MGR := unknown
   endif
+
 else
-  DISTRO := unknown
+  PKG_MGR := unknown
 endif
+
 
 .PHONY: all build install uninstall test clean help deps deps-ubuntu deps-fedora
 
@@ -51,16 +53,16 @@ test:
 clean:
 	$(MAKE) -C src clean
 
-# Detect and install dependencies automatically
+# Detect and install dependencies automatically based on package manager
 deps:
-	@echo "Detected system: $(DISTRO)"
-	@if [ "$(DISTRO)" = "ubuntu" ] || [ "$(DISTRO)" = "debian" ]; then \
+	@echo "Detected package manager: $(PKG_MGR)"
+	@if [ "$(PKG_MGR)" = "apt" ]; then \
 		$(MAKE) deps-ubuntu; \
-	elif [ "$(DISTRO)" = "fedora" ]; then \
+	elif [ "$(PKG_MGR)" = "dnf" ] || [ "$(PKG_MGR)" = "yum" ]; then \
 		$(MAKE) deps-fedora; \
 	else \
-		echo "ERROR: Unable to detect Linux distro. Please install dependencies manually."; \
-		echo "See docs/building.md for manual installation instructions."; \
+		echo "Unsupported package manager. Only Ubuntu/Debian (apt) and Fedora/RHEL (dnf/yum) are supported."; \
+		echo "Required packages: clang, llvm 18, bison, flex, python3, python3-pip"; \
 		exit 1; \
 	fi
 
@@ -68,7 +70,8 @@ deps:
 deps-ubuntu:
 	@echo "Installing dependencies for Ubuntu/Debian..."
 	sudo apt-get update
-	sudo apt-get install -y build-essential bison flex python3 python3-pip wget
+	# lsb-release is required by llvm.sh script, libzstd-dev for linking
+	sudo apt-get install -y build-essential bison flex python3 python3-pip wget lsb-release software-properties-common gnupg libzstd-dev
 	# Install LLVM 18
 	wget https://apt.llvm.org/llvm.sh
 	chmod +x llvm.sh
@@ -78,15 +81,15 @@ deps-ubuntu:
 	# Create symlinks
 	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
 	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-	sudo ln -sf /usr/bin/llc-18 /usr/bin/llc
 	rm llvm.sh
-	# Install pytest
-	pip3 install pytest
+	# Install pytest via apt (avoids PEP 668 externally-managed-environment issues)
+	sudo apt-get install -y python3-pytest
 	@echo "Dependencies installed successfully!"
 
-# Fedora/RHEL dependencies
+# Fedora/RHEL dependencies (requires LLVM 18)
 deps-fedora:
 	@echo "Installing dependencies for Fedora/RHEL..."
+	@echo "Note: Fedora repos may not have LLVM 18. Ubuntu/Debian is recommended."
 	sudo dnf install -y \
 		clang \
 		llvm18 \
@@ -95,14 +98,10 @@ deps-fedora:
 		flex \
 		bison \
 		gcc-c++ \
+		zlib-devel \
+		ncurses-devel \
 		python3 \
-		python3-pip
-	# Create symlinks if needed
-	sudo ln -sf /usr/bin/clang-18 /usr/bin/clang 2>/dev/null || true
-	sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++ 2>/dev/null || true
-	sudo ln -sf /usr/bin/llc-18 /usr/bin/llc 2>/dev/null || true
-	# Install pytest
-	pip3 install pytest
+		python3-pytest
 	@echo "Dependencies installed successfully!"
 
 help:
@@ -110,9 +109,9 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  make            - Build the compiler"
-	@echo "  make deps       - Install dependencies (auto-detects distro)"
-	@echo "  make deps-ubuntu- Install Ubuntu/Debian dependencies"
-	@echo "  make deps-fedora- Install Fedora/RHEL dependencies"
+	@echo "  make deps       - Install dependencies (Ubuntu/Debian/Fedora)"
+	@echo "  make deps-ubuntu- Manual: Ubuntu/Debian dependencies (apt)"
+	@echo "  make deps-fedora- Manual: Fedora/RHEL dependencies (dnf)"
 	@echo "  make install    - Build and install to $(BINDIR) (may need sudo)"
 	@echo "  make uninstall  - Remove installation"
 	@echo "  make test       - Run test suite"

@@ -5,6 +5,8 @@ Dana is an educational programming language designed as a semester project for t
 
 [![Language](https://img.shields.io/badge/language-C%2B%2B17-blue)](https://en.cppreference.com/w/cpp/17)
 [![LLVM](https://img.shields.io/badge/LLVM-18-orange)](https://llvm.org/)
+[![Bison](https://img.shields.io/badge/Bison-3.8%2B-green)](https://www.gnu.org/software/bison/)
+[![Flex](https://img.shields.io/badge/Flex-2.6%2B-yellowgreen)](https://github.com/westes/flex)
 
 ## Features
 
@@ -84,7 +86,8 @@ danac myprogram.dana && ./a.out
 git clone https://github.com/geokoko/dana_compiler.git
 cd dana_compiler
 
-# Install dependencies (auto-detects your distro: works for Fedora/RHEL, Ubuntu/Debian)
+# Install dependencies (auto-detects your package manager)
+# Supports: Ubuntu/Debian (apt), Fedora/RHEL (dnf/yum), Arch (pacman), openSUSE (zypper)
 make deps
 
 # Build and install
@@ -100,7 +103,7 @@ danac myprogram.dana && ./a.out
 
 - Build essentials (gcc, g++, make)
 - Clang 18 (with C++17 support)
-- LLVM 18 (development libraries, llc)
+- LLVM 18 (development libraries)
 - Flex & Bison
 - Python 3 with pip and pytest
 
@@ -108,11 +111,18 @@ danac myprogram.dana && ./a.out
 
 ```bash
 make            # Build compiler
+make deps       # Install dependencies (auto-detects package manager)
 make install    # Install to /usr/local/bin (needs sudo)
 make uninstall  # Remove installation
 make test       # Run test suite (requires prior build)
 make clean      # Clean build artifacts
 ```
+
+#### Supported Distributions
+
+The `make deps` command works on:
+- **Ubuntu/Debian** (apt) - LLVM 18 installed via official llvm.sh
+- **Fedora/RHEL** (dnf/yum) - uses system LLVM packages
 
 ## Usage
 

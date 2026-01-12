@@ -1,0 +1,101 @@
+name: Test Dependencies
+
+# Manual trigger only
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test-deps:
+    name: Test on ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Ubuntu 22.04
+            container: ubuntu:22.04
+            pkg_mgr: apt
+          - distro: Debian 12
+            container: debian:12
+            pkg_mgr: apt
+          - distro: Fedora Latest
+            container: fedora:latest
+            pkg_mgr: dnf
+    
+    container:
+      image: ${{ matrix.container }}
+    
+    steps:
+    - name: Install Git and Basic Tools
+      run: |
+        if [ "${{ matrix.pkg_mgr }}" = "apt" ]; then
+          apt-get update
+          apt-get install -y git make sudo
+        elif [ "${{ matrix.pkg_mgr }}" = "dnf" ]; then
+          dnf install -y git make sudo
+        fi
+    
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Detect Package Manager
+      run: |
+        echo "Testing package manager detection..."
+        make deps || true
+        echo "Detection output shown above"
+    
+    - name: Install Dependencies with make deps
+      run: |
+        echo "Running: make deps"
+        make deps
+    
+    - name: Verify Clang Installation
+      run: |
+        echo "Checking clang..."
+        clang --version
+        clang --version | grep -i "clang version" || (echo "ERROR: clang not found or wrong version" && exit 1)
+    
+    - name: Verify Bison Installation
+      run: |
+        echo "Checking bison..."
+        bison --version
+    
+    - name: Verify Flex Installation
+      run: |
+        echo "Checking flex..."
+        flex --version
+    
+    - name: Verify Python Installation
+      run: |
+        echo "Checking python3..."
+        python3 --version
+    
+    - name: Verify Pytest Installation
+      run: |
+        echo "Checking pytest..."
+        pytest --version || python3 -m pytest --version
+    
+    - name: Build Compiler
+      run: |
+        echo "Building compiler to verify all dependencies work..."
+        make
+        ls -lh src/danac
+    
+    - name: Test Compiler
+      run: |
+        echo "Testing compiler with a simple program..."
+        cat > test.dana << 'EOF'
+        def main
+            writeString: "Hello from ${{ matrix.distro }}!\n"
+        EOF
+        src/danac test.dana
+        ./a.out
+    
+    - name: Summary
+      if: success()
+      run: |
+        echo "SUCCESS: make deps works correctly on ${{ matrix.distro }}"
+        echo "Package manager: ${{ matrix.pkg_mgr }}"
+        echo "All dependencies installed and compiler built successfully!"
