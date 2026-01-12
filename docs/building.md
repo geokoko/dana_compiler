@@ -10,7 +10,7 @@ git clone https://github.com/geokoko/dana_compiler.git
 cd dana_compiler
 
 # Install dependencies (auto-detects package manager)
-# Supports: apt, dnf, yum, pacman, zypper
+# Supports: apt, dnf, yum
 make deps
 
 # Build and install system-wide
@@ -21,10 +21,8 @@ danac --help
 ```
 
 The `make deps` target automatically detects your package manager and installs the required packages. Supported distributions:
-- **Ubuntu/Debian** (apt/apt-get)
-- **Fedora/RHEL/CentOS** (dnf/yum)
-- **Arch Linux/Manjaro** (pacman)
-- **openSUSE** (zypper)
+- **Ubuntu/Debian** (apt)
+- **Fedora/RHEL** (dnf/yum)
 
 ---
 
@@ -66,30 +64,11 @@ pip3 install pytest
 
 ```bash
 sudo dnf install -y clang llvm18 llvm18-devel llvm18-static flex bison gcc-c++ python3 python3-pip
-sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
-sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-pip3 install pytest
+pip3 install --user pytest
 ```
 
-### Installation on Arch Linux
-
-```bash
-sudo pacman -Syu
-sudo pacman -S base-devel llvm18 clang bison flex python python-pip
-sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
-sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-pip3 install pytest --break-system-packages
-```
-
-### Installation on openSUSE
-
-```bash
-sudo zypper refresh
-sudo zypper install -y llvm18 llvm18-devel clang18 bison flex gcc-c++ python3 python3-pip
-sudo ln -sf /usr/bin/clang-18 /usr/bin/clang
-sudo ln -sf /usr/bin/clang++-18 /usr/bin/clang++
-pip3 install pytest
-```
+> [!NOTE]
+> Fedora may not have LLVM 18 in all versions. Ubuntu/Debian is recommended for guaranteed LLVM 18 support.
 
 ## Detailed Installation Steps
 
@@ -270,9 +249,7 @@ tar xf bison-3.8.tar.gz && cd bison-3.8
 | `make` | Build the compiler |
 | `make deps` | Install dependencies (auto-detects package manager) |
 | `make deps-ubuntu` | Install Ubuntu/Debian dependencies (apt) |
-| `make deps-fedora` | Install Fedora/RHEL dependencies (dnf/yum) |
-| `make deps-arch` | Install Arch Linux dependencies (pacman) |
-| `make deps-opensuse` | Install openSUSE dependencies (zypper) |
+| `make deps-fedora` | Install Fedora/RHEL dependencies (dnf) |
 | `make install` | Build and install to `/usr/local/bin` (requires sudo) |
 | `make uninstall` | Remove from `/usr/local/bin` |
 | `make test` | Run test suite (requires prior build) |

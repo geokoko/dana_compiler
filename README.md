@@ -120,11 +120,9 @@ make clean      # Clean build artifacts
 
 #### Supported Distributions
 
-The `make deps` command automatically detects your package manager and works on:
-- **Ubuntu/Debian** (apt/apt-get)
-- **Fedora/RHEL/CentOS** (dnf/yum)
-- **Arch Linux/Manjaro** (pacman)
-- **openSUSE** (zypper)
+The `make deps` command works on:
+- **Ubuntu/Debian** (apt) - LLVM 18 installed via official llvm.sh
+- **Fedora/RHEL** (dnf/yum) - uses system LLVM packages
 
 ## Usage
 

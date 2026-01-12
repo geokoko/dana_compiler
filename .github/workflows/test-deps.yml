@@ -23,12 +23,6 @@ jobs:
           - distro: Fedora Latest
             container: fedora:latest
             pkg_mgr: dnf
-          - distro: Arch Linux
-            container: archlinux:latest
-            pkg_mgr: pacman
-          - distro: openSUSE Leap
-            container: opensuse/leap:latest
-            pkg_mgr: zypper
     
     container:
       image: ${{ matrix.container }}
@@ -41,10 +35,6 @@ jobs:
           apt-get install -y git make sudo
         elif [ "${{ matrix.pkg_mgr }}" = "dnf" ]; then
           dnf install -y git make sudo
-        elif [ "${{ matrix.pkg_mgr }}" = "pacman" ]; then
-          pacman -Sy --noconfirm git make sudo fakeroot
-        elif [ "${{ matrix.pkg_mgr }}" = "zypper" ]; then
-          zypper install -y git make sudo
         fi
     
     - name: Checkout Repository
