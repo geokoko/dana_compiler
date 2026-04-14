@@ -70,7 +70,7 @@ static llvm::Function* ensureLLVMFunction(CodegenContext& genCtx, const FuncSymb
 
 static bool hasNestedFuncDefs(const vec<up<Def>>& defs) {
 	for (const auto& defn : defs) {
-		if (dynamic_cast<FuncDef*>(defn.get())) {
+		if (defn && defn->getKind() == Def::DefKind::FuncDef) {
 			return true;
 		}
 	}
@@ -168,7 +168,8 @@ void Codegen::visit(FuncDef& n) {
 
 		// Add Locals
 		for (auto& def : n.localDefs()) {
-			if (auto* var = dynamic_cast<VarDef*>(def.get())) {
+			if (def && def->getKind() == Def::DefKind::Var) {
+				auto* var = static_cast<VarDef*>(def.get());
 				for (auto* sym : var->symbols()) {
 					structFields.push_back(genCtx.getLLVMType(*sym->getType()));
 					frameInfo->capturedIndices[sym] = fieldIndex++;
@@ -204,7 +205,8 @@ void Codegen::visit(FuncDef& n) {
 
 		// Bind Locals
 		for (auto& def : n.localDefs()) {
-			if (auto* var = dynamic_cast<VarDef*>(def.get())) {
+			if (def && def->getKind() == Def::DefKind::Var) {
+				auto* var = static_cast<VarDef*>(def.get());
 				for (auto* sym : var->symbols()) {
 					auto idx = frameInfo->capturedIndices[sym];
 					llvm::Value* localGEP = genCtx.builder().CreateStructGEP(frameStructTy, framePtr, idx, sym->getName() + ".ptr");
@@ -231,7 +233,8 @@ void Codegen::visit(FuncDef& n) {
 
 		// Individual Allocas for Locals
 		for (auto& def : n.localDefs()) {
-			if (auto* var = dynamic_cast<VarDef*>(def.get())) {
+			if (def && def->getKind() == Def::DefKind::Var) {
+				auto* var = static_cast<VarDef*>(def.get());
 				for (auto* sym : var->symbols()) {
 					llvm::Type* ty = genCtx.getLLVMType(*sym->getType());
 					llvm::AllocaInst* allocaInst = genCtx.builder().CreateAlloca(ty, nullptr, sym->getName());
@@ -243,23 +246,33 @@ void Codegen::visit(FuncDef& n) {
 
 	/* Predeclare nested functions (defs and decls) */
 	for (auto& def : n.localDefs()) {
-		if (auto* decl = dynamic_cast<FuncDecl*>(def.get())) {
-			decl->accept(*this);
+		if (!def) {
 			continue;
 		}
-		if (auto* defn = dynamic_cast<FuncDef*>(def.get())) {
-			auto* nestedHeader = defn->funcHeader();
-			auto* nestedSym = nestedHeader ? nestedHeader->symbol() : nullptr;
-			auto nestedSig = buildSignature(genCtx, nestedSym);
-			ensureLLVMFunction(genCtx, nestedSym, nestedSig);
+		switch (def->getKind()) {
+			case Def::DefKind::FuncDecl:
+				static_cast<FuncDecl*>(def.get())->accept(*this);
+				continue;
+			case Def::DefKind::FuncDef: {
+				auto* defn = static_cast<FuncDef*>(def.get());
+				auto* nestedHeader = defn->funcHeader();
+				auto* nestedSym = nestedHeader ? nestedHeader->symbol() : nullptr;
+				auto nestedSig = buildSignature(genCtx, nestedSym);
+				ensureLLVMFunction(genCtx, nestedSym, nestedSig);
+				continue;
+			}
+			case Def::DefKind::FPar:
+			case Def::DefKind::Header:
+			case Def::DefKind::Var:
+				continue;
 		}
 	}
 
 	/* Generate Nested Function Local Defs */
 	auto savedIP = genCtx.builder().saveIP();
 	for (auto& def : n.localDefs()) {
-		if (auto* nestedFunc = dynamic_cast<FuncDef*>(def.get())) {
-			nestedFunc->accept(*this);
+		if (def && def->getKind() == Def::DefKind::FuncDef) {
+			static_cast<FuncDef*>(def.get())->accept(*this);
 		}
 	}
 	genCtx.builder().restoreIP(savedIP);

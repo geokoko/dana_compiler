@@ -48,9 +48,27 @@ inline std::ostream& operator<<(std::ostream& out, const ASTNode& node) {
 // Expression nodes
 class Expr : public ASTNode {
 public:
-    explicit Expr(SourceLoc loc);
+	enum class ExprKind {
+		IntConst,
+		CharConst,
+		TrueConst,
+		FalseConst,
+		LValueExpr,
+		ParenExpr,
+		FuncCall,
+		UnaryExpr,
+		BinaryExpr,
+		ExprCond,
+		ParenCond,
+		NotCond,
+		BinaryCond,
+		RelCond,
+	};
+
+    Expr(SourceLoc loc, ExprKind kind);
     virtual ~Expr();
     virtual void print(std::ostream &out) const override = 0;
+	ExprKind getKind() const;
 	SemaTypePtr type() const;
 	void setType(SemaTypePtr type);
 	bool isLValue() const;
@@ -60,6 +78,7 @@ public:
 	bool isConstExpr() const;
 	void setConstExpr(bool v);
 private:
+	ExprKind kind_;
     SemaTypePtr resolvedType_;
     bool isLValue_ = false;
     bool assignable_ = false;
@@ -69,9 +88,24 @@ private:
 // Statements
 class Stmt : public ASTNode {
 public:
-    explicit Stmt(SourceLoc l);
+	enum class StmtKind {
+		Skip,
+		Exit,
+		Assign,
+		Return,
+		ProcCall,
+		Break,
+		Continue,
+		If,
+		Loop,
+	};
+
+    Stmt(SourceLoc l, StmtKind kind);
     virtual ~Stmt() override;
     virtual void print(std::ostream& out) const override = 0;
+	StmtKind getKind() const;
+private:
+	StmtKind kind_;
 };
 
 // L-values - the left part of an assignment statement
@@ -92,7 +126,7 @@ private:
 // R-Values are expressions - the right part of an assignment statement
 class Rval : public Expr {
 public:
-    explicit Rval(SourceLoc l);
+    Rval(SourceLoc l, ExprKind kind);
     virtual ~Rval() override = default;
     virtual void print(std::ostream& out) const override = 0;
 };
@@ -139,8 +173,19 @@ private:
 // Definitions
 class Def : public ASTNode {
 public:
-    explicit Def(SourceLoc l);
+	enum class DefKind {
+		FPar,
+		Header,
+		Var,
+		FuncDecl,
+		FuncDef,
+	};
+
+    Def(SourceLoc l, DefKind kind);
+	DefKind getKind() const;
     void print(std::ostream& out) const override;
+private:
+	DefKind kind_;
 };
 
 class FuncDef; 
@@ -489,7 +534,7 @@ private:
 
 class Cond : public Expr {
 public:
-    explicit Cond(SourceLoc l);
+    Cond(SourceLoc l, ExprKind kind);
     ~Cond() override = default;
     virtual void print(std::ostream& out) const override = 0;
 };

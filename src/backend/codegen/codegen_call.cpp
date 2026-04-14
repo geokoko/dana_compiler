@@ -73,12 +73,26 @@ llvm::Value* Codegen::makeCall(const FuncSymbol* calleeSym, const std::vector<st
 	// Helper to get LValue node
 	auto getLValueNode = [](Expr* expr) -> Lval* {
 		while (expr) {
-			if (auto* lvExpr = dynamic_cast<LValueExpr*>(expr)) return lvExpr->lvalue();
-			if (auto* paren = dynamic_cast<ParenExpr*>(expr)) {
-				expr = paren->innerExpr();
-				continue;
+			switch (expr->getKind()) {
+				case Expr::ExprKind::LValueExpr:
+					return static_cast<LValueExpr*>(expr)->lvalue();
+				case Expr::ExprKind::ParenExpr:
+					expr = static_cast<ParenExpr*>(expr)->innerExpr();
+					continue;
+				case Expr::ExprKind::IntConst:
+				case Expr::ExprKind::CharConst:
+				case Expr::ExprKind::TrueConst:
+				case Expr::ExprKind::FalseConst:
+				case Expr::ExprKind::FuncCall:
+				case Expr::ExprKind::UnaryExpr:
+				case Expr::ExprKind::BinaryExpr:
+				case Expr::ExprKind::ExprCond:
+				case Expr::ExprKind::ParenCond:
+				case Expr::ExprKind::NotCond:
+				case Expr::ExprKind::BinaryCond:
+				case Expr::ExprKind::RelCond:
+					return nullptr;
 			}
-			break;
 		}
 		return nullptr;
 	};
@@ -152,4 +166,3 @@ void Codegen::visit(ProcCall& n) {
 	}
 	makeCall(calleeSym, n.arguments());
 }
-

@@ -819,8 +819,9 @@ void SemanticPass::visit(ExprCond& n) {
 	// Dana does not allow bare expressions as conditions - except boolean literals; 
 	// conditions must be relational (=, <>, <, >, <=, >=) or logical (and, or, not)
 	// for variables of type byte.
-	if (dynamic_cast<TrueConst*>(n.expression()) ||
-		dynamic_cast<FalseConst*>(n.expression())) {
+	auto* expr = n.expression();
+	if (expr && (expr->getKind() == Expr::ExprKind::TrueConst ||
+				 expr->getKind() == Expr::ExprKind::FalseConst)) {
 		n.setType(makeByteType());
 		return;
 	}
