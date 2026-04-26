@@ -37,31 +37,30 @@ bool ControlFlowPass::stmtCanFallThrough(const Stmt* stmt) {
 	if (!stmt) {
 		return true;
 	}
-	if (dynamic_cast<const ReturnStmt*>(stmt)) {
-		return false;
-	}
-	if (dynamic_cast<const ExitStmt*>(stmt)) {
-		return false;
-	}
-	if (dynamic_cast<const BreakStmt*>(stmt)) {
-		return false;
-	}
-	if (dynamic_cast<const ContinueStmt*>(stmt)) {
-		return false;
-	}
-	if (const auto* ifstmt = dynamic_cast<const IfStmt*>(stmt)) {
-		if (!ifstmt->elseBlock()) {
+	switch (stmt->getKind()) {
+		case Stmt::StmtKind::Return:
+		case Stmt::StmtKind::Exit:
+		case Stmt::StmtKind::Break:
+		case Stmt::StmtKind::Continue:
+			return false;
+		case Stmt::StmtKind::If: {
+			const auto* ifstmt = static_cast<const IfStmt*>(stmt);
+			if (!ifstmt->elseBlock()) {
+				return true;
+			}
+			bool canFallThrough = blockCanFallThrough(ifstmt->thenBlock());
+			for (const auto& elif : ifstmt->elifs()) {
+				canFallThrough = canFallThrough || blockCanFallThrough(elif.second.get());
+			}
+			canFallThrough = canFallThrough || blockCanFallThrough(ifstmt->elseBlock());
+			return canFallThrough;
+		}
+		case Stmt::StmtKind::Loop:
+			return loopCanFallThrough(static_cast<const LoopStmt*>(stmt));
+		case Stmt::StmtKind::Skip:
+		case Stmt::StmtKind::Assign:
+		case Stmt::StmtKind::ProcCall:
 			return true;
-		}
-		bool canFallThrough = blockCanFallThrough(ifstmt->thenBlock());
-		for (const auto& elif : ifstmt->elifs()) {
-			canFallThrough = canFallThrough || blockCanFallThrough(elif.second.get());
-		}
-		canFallThrough = canFallThrough || blockCanFallThrough(ifstmt->elseBlock());
-		return canFallThrough;
-	}
-	if (const auto* loop = dynamic_cast<const LoopStmt*>(stmt)) {
-		return loopCanFallThrough(loop);
 	}
 	return true;
 }
@@ -86,28 +85,38 @@ bool ControlFlowPass::stmtHasBreakForLoop(const Stmt* stmt,
 	if (!stmt) {
 		return false;
 	}
-	if (const auto* brk = dynamic_cast<const BreakStmt*>(stmt)) {
-		if (brk->loopLabel()) {
-			return loopLabel && *brk->loopLabel() == *loopLabel;
+	switch (stmt->getKind()) {
+		case Stmt::StmtKind::Break: {
+			const auto* brk = static_cast<const BreakStmt*>(stmt);
+			if (brk->loopLabel()) {
+				return loopLabel && *brk->loopLabel() == *loopLabel;
+			}
+			return depth == 0;
 		}
-		return depth == 0;
-	}
-	if (const auto* ifstmt = dynamic_cast<const IfStmt*>(stmt)) {
-		if (blockHasBreakForLoop(ifstmt->thenBlock(), loopLabel, depth)) {
-			return true;
-		}
-		for (const auto& elif : ifstmt->elifs()) {
-			if (blockHasBreakForLoop(elif.second.get(), loopLabel, depth)) {
+		case Stmt::StmtKind::If: {
+			const auto* ifstmt = static_cast<const IfStmt*>(stmt);
+			if (blockHasBreakForLoop(ifstmt->thenBlock(), loopLabel, depth)) {
 				return true;
 			}
+			for (const auto& elif : ifstmt->elifs()) {
+				if (blockHasBreakForLoop(elif.second.get(), loopLabel, depth)) {
+					return true;
+				}
+			}
+			if (ifstmt->elseBlock() && blockHasBreakForLoop(ifstmt->elseBlock(), loopLabel, depth)) {
+				return true;
+			}
+			return false;
 		}
-		if (ifstmt->elseBlock() && blockHasBreakForLoop(ifstmt->elseBlock(), loopLabel, depth)) {
-			return true;
-		}
-		return false;
-	}
-	if (const auto* loop = dynamic_cast<const LoopStmt*>(stmt)) {
-		return blockHasBreakForLoop(loop->loopBody(), loopLabel, depth + 1);
+		case Stmt::StmtKind::Loop:
+			return blockHasBreakForLoop(static_cast<const LoopStmt*>(stmt)->loopBody(), loopLabel, depth + 1);
+		case Stmt::StmtKind::Skip:
+		case Stmt::StmtKind::Exit:
+		case Stmt::StmtKind::Assign:
+		case Stmt::StmtKind::Return:
+		case Stmt::StmtKind::ProcCall:
+		case Stmt::StmtKind::Continue:
+			return false;
 	}
 	return false;
 }
